@@ -48,8 +48,20 @@ En 1–2 minutos el sitio queda en:
 | Categorías de los filtros | botones `.filter` en `index.html` + campo `cat` de cada producto |
 | Correo, dirección y horarios | sección `#contacto` en `index.html` |
 | Redes sociales | bloque `.socials` en `index.html` (cambia los `href="#"`) |
-| Precios de las cajas sorpresa | sección `#cajas` en `index.html` |
+| Precios de las cajas sorpresa | sección `#cajas` en `index.html` (hoy comentada) |
 | Colores de la marca | `styles.css` → variables en `:root` |
+
+## 🙈 Sección oculta: Cajas sorpresa
+
+La sección **Cajas sorpresa / suscripción** sigue en el repo pero está **comentada**, así que no se ve en el sitio. Para reactivarla busca `CAJAS SORPRESA` en `index.html` y descomenta los 5 puntos:
+
+1. El bloque grande `<section id="cajas">` (quita la línea de apertura del comentario y la de cierre `===== FIN CAJAS SORPRESA (OCULTA) ===== -->`).
+2. El enlace del menú principal.
+3. El enlace del footer.
+4. El mensaje de la barra promocional (aparece 2 veces, por la animación en bucle).
+5. La opción `Caja sorpresa / suscripción` del formulario de contacto.
+
+También hay un testimonio cuyo texto original mencionaba la caja; quedó comentado justo arriba del texto actual por si quieres restaurarlo.
 
 ## 🧩 Secciones incluidas
 
@@ -59,7 +71,7 @@ En 1–2 minutos el sitio queda en:
 - Beneficios / propuesta de valor
 - **Nosotros** (historia, misión, visión, valores)
 - **Productos** con filtros por país y botón directo a WhatsApp
-- Cajas sorpresa / suscripción mensual (3 planes)
+- ~~Cajas sorpresa / suscripción mensual (3 planes)~~ *(comentada, ver arriba)*
 - Mayoreo para tiendas y revendedores
 - Testimonios
 - Preguntas frecuentes (acordeón)
