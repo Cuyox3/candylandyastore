@@ -495,6 +495,24 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 }
 .footer-bottom p{ margin:0; }
 
+/* Crédito del autor: fila propia y centrada, para que los botones
+   flotantes (WhatsApp / subir) no se le encimen */
+.footer-autor{
+  flex-basis:100%; display:flex; justify-content:center; align-items:center; gap:8px;
+  margin-top:14px; padding-top:14px; border-top:1px solid rgba(255,255,255,.10);
+}
+.footer-bottom a{
+  color:#fff; font-weight:700; text-decoration:none;
+  border-bottom:1px dashed rgba(255,255,255,.45);
+  transition:color .2s ease, border-color .2s ease;
+}
+.footer-bottom a:hover{ color:var(--yellow); border-bottom-color:var(--yellow); }
+.autor-emoji{
+  border-bottom:0 !important; font-size:1.1rem; line-height:1;
+  text-decoration:none; transition:transform .2s ease;
+}
+.autor-emoji:hover{ transform:translateY(-3px) scale(1.15); }
+
 /* ---------- Botones flotantes ---------- */
 .fab-wa{
   position:fixed; right:20px; bottom:20px; z-index:99;
@@ -577,6 +595,7 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
   .footer-brand img{ margin-inline:auto; }
   .footer-brand p{ margin-inline:auto; }
   .footer-bottom{ justify-content:center; text-align:center; }
+  .footer{ padding-bottom:96px; }
   .newsletter-form{ flex-direction:column; border-radius:var(--radius); padding:12px; }
   .newsletter-form input{ padding:12px 14px; text-align:center; }
   .hero-stats{ gap:12px 22px; }
