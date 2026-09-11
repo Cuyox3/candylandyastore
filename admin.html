@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Panel de administración | Candylandia Store</title>
-<meta name="description" content="Panel para agregar y quitar productos del catálogo de Candylandia Store.">
+<meta name="description" content="Panel para agregar, modificar y quitar productos del catálogo de Candylandia Store.">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#F42A8F">
 <link rel="icon" href="assets/logo.png">
@@ -20,10 +20,10 @@
 <div class="topbar">
   <div class="topbar-track">
     <span>🍬 Panel de administración de Candylandia Store</span>
-    <span>✨ Agrega y quita productos del catálogo</span>
+    <span>✨ Agrega, modifica y quita productos · con foto o con emoji</span>
     <span>💾 Los cambios se guardan en este navegador</span>
     <span>🍬 Panel de administración de Candylandia Store</span>
-    <span>✨ Agrega y quita productos del catálogo</span>
+    <span>✨ Agrega, modifica y quita productos · con foto o con emoji</span>
     <span>💾 Los cambios se guardan en este navegador</span>
   </div>
 </div>
@@ -55,14 +55,18 @@
       <img src="assets/mascota.png" alt="Candy, mascota de Candylandia Store">
       <span class="eyebrow">Área privada</span>
       <h2>Panel de <span class="grad-text">administración</span></h2>
-      <p>Escribe la clave del panel para administrar el catálogo de productos.</p>
+      <p>Escribe tu usuario y tu clave para administrar el catálogo de productos.</p>
+      <div class="field">
+        <label class="sr-only" for="usuario">Usuario</label>
+        <input type="text" id="usuario" name="usuario" placeholder="Usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </div>
       <div class="field">
         <label class="sr-only" for="clave">Clave de acceso</label>
         <input type="password" id="clave" name="clave" placeholder="Clave de acceso" autocomplete="current-password" required>
       </div>
       <button type="submit" class="btn btn-pink btn-lg btn-block">Entrar 🍭</button>
       <p class="form-msg" id="gateMsg" role="status"></p>
-      <small class="form-note">La clave se configura en admin.js. Es una traba simple, no una medida de seguridad real.</small>
+      <small class="form-note">Demo: usuario <code>admin</code> · clave <code>demo123</code>. Se configuran en admin.js; es una traba simple, no seguridad real.</small>
     </form>
   </div>
 </section>
@@ -75,7 +79,7 @@
       <div>
         <span class="eyebrow">Catálogo</span>
         <h2>Administra tus <span class="grad-text">productos</span></h2>
-        <p>Agrega dulces nuevos o quita los que ya no vendes. La tienda se actualiza al instante.</p>
+        <p>Agrega dulces nuevos, modifica los que ya tienes o quita los que ya no vendes. La tienda se actualiza al instante.</p>
       </div>
       <a href="index.html#productos" class="btn btn-cyan">Ver la tienda 🍭</a>
     </div>
@@ -90,12 +94,20 @@
       </p>
     </div>
 
+    <div class="admin-note" id="notaCarpeta">
+      <span>📁</span>
+      <p id="notaCarpetaTxt">
+        Las fotos que subas se guardan en <code>assets/productos/</code> dentro del proyecto.
+      </p>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnCarpeta">Elegir carpeta del proyecto</button>
+    </div>
+
     <div class="admin-grid">
 
       <!-- ---------- Formulario ---------- -->
       <section class="admin-panel">
-        <h3>➕ Agregar producto</h3>
-        <p>Se coloca al inicio del catálogo para que se vea primero.</p>
+        <h3 id="formTitulo">➕ Agregar producto</h3>
+        <p id="formSub">Se coloca al inicio del catálogo para que se vea primero.</p>
 
         <form id="formProducto" novalidate>
           <div class="field">
@@ -126,6 +138,24 @@
           </div>
 
           <div class="field">
+            <label for="fArchivo">Foto del producto <small>(opcional, sustituye al emoji)</small></label>
+
+            <div class="img-drop" id="imgDrop">
+              <input type="file" id="fArchivo" name="archivo" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" hidden>
+              <div class="img-thumb" id="imgThumb" hidden>
+                <img id="imgPreview" alt="Vista previa de la foto del producto">
+              </div>
+              <p class="img-drop-txt" id="imgTexto">Arrastra una foto aquí o <b>elige un archivo</b><br><small>PNG, JPG o WebP · se reduce a 560 px automáticamente</small></p>
+              <div class="img-acciones">
+                <button type="button" class="btn btn-ghost btn-sm" id="btnElegirImg">📷 Elegir foto</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="btnQuitarImg" hidden>Quitar foto</button>
+              </div>
+            </div>
+
+            <p class="img-estado" id="imgEstado" role="status"></p>
+          </div>
+
+          <div class="field">
             <label for="fDesc">Descripción *</label>
             <textarea id="fDesc" name="desc" rows="3" maxlength="160" placeholder="Cuéntale al cliente por qué le va a encantar…" required></textarea>
           </div>
@@ -144,7 +174,8 @@
             </div>
           </div>
 
-          <button type="submit" class="btn btn-pink btn-lg btn-block">Agregar al catálogo 🍬</button>
+          <button type="submit" class="btn btn-pink btn-lg btn-block" id="btnGuardar">Agregar al catálogo 🍬</button>
+          <button type="button" class="btn btn-ghost btn-block" id="btnCancelar" hidden>Cancelar edición</button>
           <p class="form-msg" id="formMsg" role="status"></p>
         </form>
 
@@ -157,7 +188,7 @@
       <!-- ---------- Listado ---------- -->
       <section class="admin-panel">
         <h3>🗂️ Productos en el catálogo</h3>
-        <p>Pulsa la ✕ de una tarjeta para quitarla de la tienda.</p>
+        <p>Pulsa ✎ para modificar un producto o ✕ para quitarlo de la tienda.</p>
 
         <div class="admin-toolbar">
           <label class="sr-only" for="buscar">Buscar producto</label>
@@ -211,6 +242,7 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="productos.js"></script>
+<script src="imagenes.js"></script>
 <script src="admin.js"></script>
 </body>
 </html>

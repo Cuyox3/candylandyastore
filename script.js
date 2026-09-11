@@ -36,7 +36,7 @@ function cardHTML(p){
     <article class="card" data-cat="${esc(p.cat)}">
       <div class="card-media" style="--c1:${esc(p.c1)};--c2:${esc(p.c2)}">
         ${tag}
-        <span class="emoji">${esc(p.emoji)}</span>
+        ${CandyImg.mediaHTML(p, esc)}
       </div>
       <div class="card-body">
         <span class="card-origin">${esc(p.origen)}</span>
@@ -66,6 +66,9 @@ function renderProductos(filtro){
   grid.innerHTML = lista.length
     ? lista.map(cardHTML).join('')
     : '<p style="grid-column:1/-1;text-align:center;color:#6B5573">Pronto agregaremos productos de esta categoría 🍬</p>';
+
+  /* Si una foto aún no está en la carpeta, usa la copia del navegador */
+  CandyImg.aplicarRespaldos(grid);
 }
 
 renderFiltros();

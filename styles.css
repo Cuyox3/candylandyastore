@@ -284,7 +284,7 @@ button{ font-family:inherit; }
 @keyframes pop{ from{ opacity:0; transform:scale(.94) translateY(10px);} to{ opacity:1; transform:none;} }
 
 .card-media{
-  position:relative; height:170px; display:grid; place-items:center;
+  position:relative; height:170px; overflow:hidden; display:grid; place-items:center;
   font-size:4.2rem; background:linear-gradient(140deg, var(--c1), var(--c2));
 }
 .card-media::after{
@@ -292,6 +292,13 @@ button{ font-family:inherit; }
   background:radial-gradient(circle at 30% 25%, rgba(255,255,255,.55), transparent 55%);
 }
 .card-media .emoji{ position:relative; z-index:1; filter:drop-shadow(0 8px 12px rgba(63,11,76,.25)); }
+/* Foto del producto: ocupa el mismo hueco que el emoji y se ve
+   completa (contain), sin deformarse ni desbordar la tarjeta */
+.card-media .card-img{
+  position:absolute; inset:0; z-index:1; width:100%; height:100%;
+  object-fit:contain; padding:14px;
+  filter:drop-shadow(0 8px 12px rgba(63,11,76,.25));
+}
 .tag{
   position:absolute; top:12px; left:12px; z-index:2;
   background:var(--purple-deep); color:#fff; font-family:var(--font-title);
@@ -669,6 +676,35 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 }
 .swatch:hover{ transform:translateY(-3px); box-shadow:var(--shadow); }
 
+/* ---------- Subir foto del producto ---------- */
+.img-drop{
+  display:grid; gap:12px; justify-items:center; text-align:center;
+  padding:18px 16px; border:2px dashed var(--line); border-radius:var(--radius-sm);
+  background:var(--cream); transition:border-color .2s ease, background .2s ease;
+}
+.img-drop.arrastrando{ border-color:var(--pink); background:#fff; }
+.img-drop.con-foto{ border-style:solid; }
+.img-drop-txt{ font-size:.88rem; color:var(--ink-soft); margin:0; }
+.img-drop-txt small{ color:var(--ink-soft); opacity:.8; }
+/* `display` de la clase gana al atributo hidden, así que lo forzamos */
+.img-thumb[hidden], .img-drop-txt[hidden]{ display:none; }
+.img-thumb{
+  width:132px; height:132px; border-radius:var(--radius-sm); overflow:hidden;
+  background:linear-gradient(140deg, var(--pink), var(--pink-soft));
+  display:grid; place-items:center; box-shadow:var(--shadow);
+}
+.img-thumb img{ width:100%; height:100%; object-fit:contain; padding:8px; }
+.img-acciones{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.img-estado{ font-size:.82rem; color:var(--ink-soft); margin-top:8px; word-break:break-word; }
+.img-estado.error{ color:#D42B4B; font-weight:700; }
+.field label small{ font-weight:600; color:var(--ink-soft); }
+
+/* Aviso de la carpeta del proyecto */
+#notaCarpeta{ align-items:center; flex-wrap:wrap; }
+#notaCarpeta p{ flex:1; min-width:230px; }
+#notaCarpeta .btn{ flex:none; white-space:nowrap; }
+#notaCarpeta code{ word-break:break-word; }
+
 /* ---------- Vista previa ---------- */
 .admin-preview{ margin-top:26px; padding-top:22px; border-top:2px dashed var(--line); }
 .admin-preview h4{
@@ -698,14 +734,24 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 .admin-item{ position:relative; }
 .admin-item .card{ height:100%; }
 .admin-item .card-btn{ pointer-events:none; opacity:.55; }
-.card-del{
-  position:absolute; top:10px; right:10px; z-index:3;
+.card-del,
+.card-edit{
+  position:absolute; top:10px; z-index:3;
   width:34px; height:34px; border-radius:50%; border:0; cursor:pointer;
   display:grid; place-items:center; font-size:1rem; line-height:1;
-  background:#fff; color:#D42B4B; box-shadow:0 8px 18px rgba(63,11,76,.22);
+  background:#fff; box-shadow:0 8px 18px rgba(63,11,76,.22);
   transition:transform .18s ease, background .18s ease, color .18s ease;
 }
+.card-del{ right:10px; color:#D42B4B; }
 .card-del:hover{ transform:scale(1.12); background:#D42B4B; color:#fff; }
+
+/* El lápiz va junto a la ✕, un poco más a la izquierda */
+.card-edit{ right:52px; color:var(--purple-mid); }
+.card-edit:hover{ transform:scale(1.12); background:var(--purple-mid); color:#fff; }
+
+/* Tarjeta que se está modificando en el formulario */
+.admin-item.editando .card{ outline:3px solid var(--pink); outline-offset:3px; }
+.admin-item.editando .card-edit{ background:var(--pink); color:#fff; }
 .admin-empty{
   grid-column:1/-1; text-align:center; color:var(--ink-soft);
   font-weight:600; padding:40px 10px;

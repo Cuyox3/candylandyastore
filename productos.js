@@ -4,6 +4,8 @@
    de administración (admin.html).
 
    · PRODUCTOS_BASE  → catálogo "de fábrica" que viaja en el código.
+     Cada producto se muestra con su emoji, o con una foto si
+     tiene `img` (ruta dentro de assets/productos/, ver imagenes.js).
    · CandyDB         → guarda los cambios del panel en el navegador
                        (localStorage) sin necesidad de servidor.
 
@@ -114,6 +116,7 @@ const CandyDB = (function(){
       id:       String(p.id || nuevoId(p.nombre)),
       cat:      String(p.cat || 'japon'),
       emoji:    String(p.emoji || '🍬'),
+      img:      String(p.img || ''),   // ruta relativa, ej. assets/productos/foo.webp
       nombre:   String(p.nombre || 'Sin nombre'),
       origen:   String(p.origen || ''),
       desc:     String(p.desc || ''),
@@ -172,6 +175,22 @@ const CandyDB = (function(){
       const producto = normalizar(Object.assign({}, datos, { id: nuevoId(datos.nombre) }));
       const lista = this.todos();
       lista.unshift(producto);
+      return escribir(lista) ? producto : null;
+    },
+
+    /* Busca un producto por id. Devuelve el producto o null */
+    obtener(id){
+      return this.todos().find(p => p.id === id) || null;
+    },
+
+    /* Modifica un producto existente. Devuelve el producto actualizado o null.
+       El id NO cambia, así la tienda conserva la referencia al producto. */
+    actualizar(id, datos){
+      const lista = this.todos();
+      const i = lista.findIndex(p => p.id === id);
+      if(i === -1) return null;
+      const producto = normalizar(Object.assign({}, lista[i], datos, { id }));
+      lista[i] = producto;
       return escribir(lista) ? producto : null;
     },
 

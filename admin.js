@@ -1,13 +1,14 @@
 /* =========================================================
    Candylandia Store — panel de administración
-   Agrega y quita productos del catálogo (productos.js).
+   Agrega, modifica y quita productos del catálogo (productos.js).
    ========================================================= */
 
 const ADMIN = {
-  /* Clave para entrar al panel. Cámbiala por la que quieras.
-     Ojo: al ser un sitio estático, esta clave viaja en el código
-     y solo sirve para evitar entradas casuales, no es seguridad real. */
-  clave: 'candylandia2021',
+  /* Usuario y clave para entrar al panel. Cámbialos por los que quieras.
+     Ojo: al ser un sitio estático, estos datos viajan en el código
+     y solo sirven para evitar entradas casuales, no son seguridad real. */
+  usuario: 'admin',
+  clave: 'demo123',
 
   /* Emojis sugeridos en el formulario */
   emojis: ['🍫','🍬','🍭','🍪','🍡','🧁','🍩','🥤','🧋','🍜','🌈','🔥','🍯','🥜','🥚','🐻','🍮','🍊','🍓','🧃'],
@@ -50,7 +51,7 @@ function cardHTML(p){
     <article class="card" data-cat="${esc(p.cat)}">
       <div class="card-media" style="--c1:${esc(p.c1)};--c2:${esc(p.c2)}">
         ${tag}
-        <span class="emoji">${esc(p.emoji)}</span>
+        ${CandyImg.mediaHTML(p, esc)}
       </div>
       <div class="card-body">
         <span class="card-origin">${esc(p.origen)}</span>
@@ -84,14 +85,22 @@ function abrirPanel(){
 
 gateForm.addEventListener('submit', e => {
   e.preventDefault();
-  const input = $('#clave');
-  if(input.value !== ADMIN.clave){
-    input.classList.add('invalid');
+  const inUsuario = $('#usuario');
+  const inClave   = $('#clave');
+
+  /* Comparamos sin espacios sobrantes; el usuario no distingue mayúsculas */
+  const okUsuario = inUsuario.value.trim().toLowerCase() === ADMIN.usuario;
+  const okClave   = inClave.value === ADMIN.clave;
+
+  inUsuario.classList.toggle('invalid', !okUsuario);
+  inClave.classList.toggle('invalid', !okClave);
+
+  if(!okUsuario || !okClave){
     gateMsg.classList.add('error');
-    gateMsg.textContent = 'Clave incorrecta. Inténtalo de nuevo.';
+    gateMsg.textContent = 'Usuario o clave incorrectos. Inténtalo de nuevo.';
     return;
   }
-  input.classList.remove('invalid');
+
   gateMsg.classList.remove('error');
   gateMsg.textContent = '';
   try{ sessionStorage.setItem(SESION, '1'); }catch(err){ /* nada */ }
@@ -144,6 +153,109 @@ $('#swatches').addEventListener('click', e => {
    --------------------------------------------------------- */
 const form = $('#formProducto');
 
+/* ---------------------------------------------------------
+   3.1 Foto del producto (opcional)
+   La foto se comprime aquí mismo y se guarda como archivo en
+   assets/productos/ cuando guardas el producto. Ver imagenes.js.
+   --------------------------------------------------------- */
+const inputArchivo = $('#fArchivo');
+const imgDrop      = $('#imgDrop');
+const imgThumb     = $('#imgThumb');
+const imgPreview   = $('#imgPreview');
+const imgTexto     = $('#imgTexto');
+const imgEstado    = $('#imgEstado');
+const btnQuitarImg = $('#btnQuitarImg');
+
+let fotoNueva = null;  /* foto recién elegida, todavía sin guardar */
+let fotoRuta  = '';    /* ruta de la foto que ya tiene el producto */
+
+const kb = bytes => Math.max(1, Math.round(bytes / 1024)) + ' KB';
+
+function mensajeFoto(texto, error){
+  imgEstado.textContent = texto || '';
+  imgEstado.classList.toggle('error', !!error);
+}
+
+/* Muestra u oculta la miniatura del recuadro */
+function pintarFoto(src){
+  const hay = !!src;
+  imgThumb.hidden = !hay;
+  btnQuitarImg.hidden = !hay;
+  imgTexto.hidden = hay;
+  imgDrop.classList.toggle('con-foto', hay);
+  if(hay) imgPreview.src = src;
+  else imgPreview.removeAttribute('src');
+}
+
+/* Deja el campo sin foto (el producto volverá a usar su emoji) */
+function limpiarFoto(){
+  fotoNueva = null;
+  fotoRuta  = '';
+  inputArchivo.value = '';
+  pintarFoto('');
+  mensajeFoto('');
+}
+
+/* Al editar: muestra la foto que ya tiene el producto */
+function cargarFotoDeProducto(ruta){
+  fotoNueva = null;
+  inputArchivo.value = '';
+  fotoRuta = ruta || '';
+  if(!fotoRuta){
+    pintarFoto('');
+    mensajeFoto('');
+    return;
+  }
+  /* Si el archivo aún no está en la carpeta, usamos la copia del navegador */
+  pintarFoto(CandyImg.respaldo(fotoRuta) || fotoRuta);
+  mensajeFoto('Foto actual: ' + fotoRuta);
+}
+
+/* Procesa el archivo que eligió o arrastró el usuario */
+async function recibirArchivo(file){
+  if(!file) return;
+  mensajeFoto('Procesando la imagen…');
+  try{
+    const foto = await CandyImg.comprimir(file);
+    fotoNueva = foto;
+    fotoRuta  = '';
+    pintarFoto(foto.dataURL);
+    mensajeFoto(`Lista (${kb(foto.peso)}). Se guardará en ${CandyImg.carpeta}/ al guardar el producto.`);
+    actualizarPreview();
+  }catch(err){
+    inputArchivo.value = '';
+    mensajeFoto(err.message || 'No se pudo usar esa imagen.', true);
+  }
+}
+
+$('#btnElegirImg').addEventListener('click', () => inputArchivo.click());
+
+inputArchivo.addEventListener('change', () => recibirArchivo(inputArchivo.files[0]));
+
+btnQuitarImg.addEventListener('click', () => {
+  limpiarFoto();
+  actualizarPreview();
+  aviso('Foto quitada. La tarjeta vuelve a mostrar el emoji.');
+});
+
+/* Arrastrar y soltar */
+['dragenter','dragover'].forEach(ev => {
+  imgDrop.addEventListener(ev, e => {
+    e.preventDefault();
+    imgDrop.classList.add('arrastrando');
+  });
+});
+['dragleave','drop'].forEach(ev => {
+  imgDrop.addEventListener(ev, e => {
+    e.preventDefault();
+    imgDrop.classList.remove('arrastrando');
+  });
+});
+imgDrop.addEventListener('drop', e => {
+  const file = e.dataTransfer && e.dataTransfer.files[0];
+  if(file) recibirArchivo(file);
+});
+
 function datosFormulario(){
   const etq = ETIQUETAS[Number(selEtiqueta.value)] || ETIQUETAS[0];
   return {
@@ -153,6 +265,9 @@ function datosFormulario(){
     origen:   $('#fOrigen').value.trim() || 'País de origen',
     desc:     $('#fDesc').value.trim() || 'Aquí va la descripción que verá tu cliente.',
     precio:   Number($('#fPrecio').value) || 0,
+    /* En la vista previa mostramos la foto recién elegida (dataURL);
+       al guardar se cambia por su ruta en assets/productos/ */
+    img:      fotoNueva ? fotoNueva.dataURL : fotoRuta,
     etiqueta: etq.etiqueta,
     tipo:     etq.tipo,
     c1:       $('#fC1').value,
@@ -162,6 +277,7 @@ function datosFormulario(){
 
 function actualizarPreview(){
   $('#preview').innerHTML = cardHTML(datosFormulario());
+  CandyImg.aplicarRespaldos($('#preview'));
 }
 
 form.addEventListener('input', actualizarPreview);
@@ -169,14 +285,79 @@ form.addEventListener('change', actualizarPreview);
 actualizarPreview();
 
 /* ---------------------------------------------------------
-   4. Agregar producto
+   4. Agregar / modificar producto
+   El mismo formulario sirve para las dos cosas:
+   si `editandoId` tiene un id, guarda sobre ese producto;
+   si es null, crea uno nuevo.
    --------------------------------------------------------- */
-const formMsg = $('#formMsg');
+const formMsg     = $('#formMsg');
+const formTitulo  = $('#formTitulo');
+const formSub     = $('#formSub');
+const btnGuardar  = $('#btnGuardar');
+const btnCancelar = $('#btnCancelar');
 
-form.addEventListener('submit', e => {
+let editandoId = null;
+
+/* Deja el formulario limpio y en modo "agregar" */
+function modoAgregar(){
+  editandoId = null;
+  form.reset();
+  limpiarFoto();
+  $('#fC1').value = '#F42A8F';
+  $('#fC2').value = '#FFB8DC';
+  form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  formMsg.classList.remove('error');
+  formMsg.textContent = '';
+  formTitulo.textContent = '➕ Agregar producto';
+  formSub.textContent = 'Se coloca al inicio del catálogo para que se vea primero.';
+  btnGuardar.textContent = 'Agregar al catálogo 🍬';
+  btnCancelar.hidden = true;
+  actualizarPreview();
+  renderLista();
+}
+
+/* Carga un producto en el formulario y pasa a modo "modificar" */
+function modoEditar(p){
+  editandoId = p.id;
+
+  selCat.value       = p.cat;
+  $('#fNombre').value = p.nombre;
+  $('#fPrecio').value = p.precio;
+  $('#fOrigen').value = p.origen;
+  $('#fEmoji').value  = p.emoji;
+  $('#fDesc').value   = p.desc;
+  $('#fC1').value     = p.c1;
+  $('#fC2').value     = p.c2;
+  cargarFotoDeProducto(p.img);
+
+  /* Buscamos qué etiqueta de la lista corresponde a este producto */
+  const iEtq = ETIQUETAS.findIndex(e => e.tipo === p.tipo && e.etiqueta === p.etiqueta);
+  selEtiqueta.value = String(iEtq === -1 ? 0 : iEtq);
+
+  form.querySelectorAll('.invalid').forEach(el => el.classList.remove('invalid'));
+  formMsg.classList.remove('error');
+  formMsg.textContent = '';
+  formTitulo.textContent = '✎ Modificando producto';
+  formSub.textContent = `Estás editando "${p.nombre}". Guarda para aplicar los cambios.`;
+  btnGuardar.textContent = 'Guardar cambios 💾';
+  btnCancelar.hidden = false;
+
+  actualizarPreview();
+  renderLista();
+  form.scrollIntoView({ behavior:'smooth', block:'start' });
+  $('#fNombre').focus();
+}
+
+btnCancelar.addEventListener('click', () => {
+  modoAgregar();
+  aviso('Edición cancelada.');
+});
+
+form.addEventListener('submit', async e => {
   e.preventDefault();
   const campos = ['fNombre','fOrigen','fEmoji','fDesc','fPrecio'];
   let valido = true;
+  let avisoFoto = '';
 
   campos.forEach(id => {
     const el = document.getElementById(id);
@@ -193,22 +374,50 @@ form.addEventListener('submit', e => {
     return;
   }
 
-  const producto = CandyDB.agregar(datosFormulario());
+  const editando = editandoId !== null;
+  const datos    = datosFormulario();
+
+  /* Si hay una foto nueva, primero la guardamos como archivo en
+     assets/productos/ y en el producto dejamos solo su ruta. */
+  if(fotoNueva){
+    btnGuardar.disabled = true;
+    const nombreArchivo = CandyDB.nuevoId(datos.nombre) + '.' + fotoNueva.ext;
+    const ruta = CandyImg.ruta(nombreArchivo);
+    let modo;
+    try{
+      modo = await CandyImg.guardarArchivo(nombreArchivo, fotoNueva.blob);
+    }finally{
+      btnGuardar.disabled = false;
+    }
+    /* Copia de respaldo para que la tarjeta se vea aunque el
+       archivo todavía no esté en su sitio */
+    CandyImg.guardarRespaldo(ruta, fotoNueva.dataURL);
+    datos.img = ruta;
+    fotoNueva = null;
+    fotoRuta  = ruta;
+    avisoFoto = (modo === 'carpeta')
+      ? `Foto guardada en ${ruta} ✅`
+      : `Se descargó ${nombreArchivo}. Colócalo en ${CandyImg.carpeta}/ del proyecto.`;
+  }
+
+  const producto = editando
+    ? CandyDB.actualizar(editandoId, datos)
+    : CandyDB.agregar(datos);
 
   if(!producto){
     formMsg.classList.add('error');
-    formMsg.textContent = 'No se pudo guardar. Revisa que tu navegador permita almacenamiento.';
+    formMsg.textContent = editando
+      ? 'No se pudo guardar. Puede que el producto ya no exista.'
+      : 'No se pudo guardar. Revisa que tu navegador permita almacenamiento.';
     return;
   }
 
-  formMsg.classList.remove('error');
-  formMsg.textContent = '';
-  form.reset();
-  $('#fC1').value = '#F42A8F';
-  $('#fC2').value = '#FFB8DC';
-  actualizarPreview();
+  modoAgregar();   // limpia el formulario y vuelve a modo agregar
   render();
-  aviso(`"${producto.nombre}" ya está en la tienda 🍬`);
+  aviso(editando
+    ? `"${producto.nombre}" se actualizó ✨`
+    : `"${producto.nombre}" ya está en la tienda 🍬`);
+  if(avisoFoto) setTimeout(() => aviso(avisoFoto), 2400);
   $('#fNombre').focus();
 });
 
@@ -238,11 +447,15 @@ function renderLista(){
   }
 
   lista.innerHTML = productos.map(p => `
-    <div class="admin-item">
+    <div class="admin-item${p.id === editandoId ? ' editando' : ''}">
+      <button type="button" class="card-edit" data-id="${esc(p.id)}"
+        aria-label="Modificar ${esc(p.nombre)}" title="Modificar producto">✎</button>
       <button type="button" class="card-del" data-id="${esc(p.id)}"
         aria-label="Quitar ${esc(p.nombre)}" title="Quitar del catálogo">✕</button>
       ${cardHTML(p)}
     </div>`).join('');
+
+  CandyImg.aplicarRespaldos(lista);
 }
 
 function renderStats(){
@@ -264,6 +477,8 @@ function renderStats(){
 function render(){
   renderLista();
   renderStats();
+  /* Suelta las copias de fotos que ya no usa ningún producto */
+  CandyImg.limpiarRespaldos(CandyDB.todos().map(p => p.img).filter(Boolean));
 }
 
 buscar.addEventListener('input', renderLista);
@@ -319,12 +534,23 @@ btnConfirmOk.addEventListener('click', () => {
 });
 
 lista.addEventListener('click', e => {
-  const btn = e.target.closest('.card-del');
+  const btn = e.target.closest('.card-edit, .card-del');
   if(!btn) return;
 
-  const producto = CandyDB.todos().find(p => p.id === btn.dataset.id);
-  if(!producto) return;
+  const producto = CandyDB.obtener(btn.dataset.id);
+  if(!producto){
+    aviso('Ese producto ya no está en el catálogo.', true);
+    render();
+    return;
+  }
 
+  /* ✎ Modificar: carga el producto en el formulario */
+  if(btn.classList.contains('card-edit')){
+    modoEditar(producto);
+    return;
+  }
+
+  /* ✕ Quitar: pide confirmación primero */
   confirmar(
     `¿Quitar "${producto.nombre}"?`,
     'Dejará de aparecer en la tienda. Puedes volver a agregarlo cuando quieras.',
@@ -335,6 +561,8 @@ lista.addEventListener('click', e => {
         aviso('No se pudo quitar el producto.', true);
         return;
       }
+      /* Si justo era el que estábamos editando, salimos del modo edición */
+      if(editandoId === fuera.id) modoAgregar();
       render();
       aviso(`"${fuera.nombre}" salió del catálogo 🗑️`);
     }
@@ -404,6 +632,7 @@ jsonBtn.addEventListener('click', async () => {
   }
 
   cerrarModal(modalJson);
+  modoAgregar();
   render();
   aviso(`Catálogo importado: ${datos.length} productos 📦`);
 });
@@ -415,6 +644,7 @@ $('#btnRestaurar').addEventListener('click', () => {
     'Sí, restaurar',
     () => {
       CandyDB.restaurar();
+      modoAgregar();
       render();
       aviso('Catálogo original restaurado 🔄');
     }
@@ -422,7 +652,47 @@ $('#btnRestaurar').addEventListener('click', () => {
 });
 
 /* ---------------------------------------------------------
-   9. Menú móvil + año del footer
+   9. Carpeta del proyecto (para guardar las fotos)
+   Chrome y Edge pueden escribir en una carpeta de tu disco si
+   tú la eliges y das permiso. El permiso se recuerda.
+   --------------------------------------------------------- */
+const btnCarpeta  = $('#btnCarpeta');
+const notaCarpeta = $('#notaCarpetaTxt');
+
+function textoCarpeta(lista){
+  if(!CandyImg.soportaCarpeta()){
+    notaCarpeta.innerHTML =
+      'Tu navegador no puede escribir en carpetas, así que las fotos se <strong>descargarán</strong>. ' +
+      'Colócalas en <code>' + CandyImg.carpeta + '/</code> dentro del proyecto. ' +
+      '(Chrome y Edge sí pueden guardarlas solos.)';
+    btnCarpeta.hidden = true;
+    return;
+  }
+  notaCarpeta.innerHTML = lista
+    ? 'Las fotos se guardan solas en <code>' + CandyImg.carpeta + '/</code> dentro de la carpeta que elegiste. ✅'
+    : 'Elige la <strong>carpeta del proyecto</strong> una vez y las fotos se guardarán solas en ' +
+      '<code>' + CandyImg.carpeta + '/</code>. Si no, se descargarán y las moverás a mano.';
+  btnCarpeta.textContent = lista ? 'Cambiar carpeta' : 'Elegir carpeta del proyecto';
+  btnCarpeta.hidden = false;
+}
+
+btnCarpeta.addEventListener('click', async () => {
+  try{
+    await CandyImg.elegirCarpeta();
+    textoCarpeta(true);
+    aviso('Carpeta lista: las fotos se guardarán en ' + CandyImg.carpeta + '/ 📁');
+  }catch(err){
+    /* Cancelar el selector no es un error que valga la pena gritar */
+    if(err && err.name === 'AbortError') return;
+    aviso(err.message || 'No se pudo usar esa carpeta.', true);
+  }
+});
+
+/* Al abrir el panel comprobamos si ya había una carpeta autorizada */
+CandyImg.carpetaGuardada(false).then(handle => textoCarpeta(!!handle));
+
+/* ---------------------------------------------------------
+   10. Menú móvil + año del footer
    --------------------------------------------------------- */
 const burger   = $('#burger');
 const navLinks = $('#navLinks');
@@ -450,7 +720,7 @@ window.addEventListener('scroll', () => {
 $('#year').textContent = new Date().getFullYear();
 
 /* ---------------------------------------------------------
-   10. Si ya hay sesión abierta, entra directo
+   11. Si ya hay sesión abierta, entra directo
    (va al final: render() necesita todo lo definido arriba)
    --------------------------------------------------------- */
 try{
