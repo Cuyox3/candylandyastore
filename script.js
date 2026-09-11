@@ -10,129 +10,77 @@ const CONFIG = {
 };
 
 /* ---------------------------------------------------------
-   1. CATÁLOGO DE PRODUCTOS (ejemplos)
-   Para agregar uno nuevo, copia un bloque y cambia los datos.
-   cat: japon | corea | usa | europa | bebidas
+   1. Render de productos
+   El catálogo vive en productos.js y puede editarse desde
+   el panel de administración (admin.html).
    --------------------------------------------------------- */
-const PRODUCTOS = [
-  { cat:'japon', emoji:'🍫', nombre:'Kit Kat Matcha', origen:'Japón',
-    desc:'Chocolate blanco con té verde de Uji. El clásico que todos piden.',
-    precio:89, etiqueta:'Top ventas', tipo:'top', c1:'#8FD98A', c2:'#D9F5C7' },
-
-  { cat:'japon', emoji:'🍡', nombre:'Hi-Chew Surtido', origen:'Japón',
-    desc:'Caramelo masticable de fresa, uva y mango. Sabor intenso de verdad.',
-    precio:65, etiqueta:'', tipo:'', c1:'#FF8AC4', c2:'#FFD6EA' },
-
-  { cat:'japon', emoji:'🍜', nombre:'Pocky Fresa', origen:'Japón',
-    desc:'Palitos crujientes bañados en crema de fresa. Ideal para compartir.',
-    precio:52, etiqueta:'', tipo:'', c1:'#F42A8F', c2:'#FFB8DC' },
-
-  { cat:'corea', emoji:'🍬', nombre:'Gomitas Peach Ring', origen:'Corea',
-    desc:'Aros de durazno con azúcar ácida. Suaves, jugosas y adictivas.',
-    precio:79, etiqueta:'Nuevo', tipo:'nuevo', c1:'#FFB36B', c2:'#FFE3C2' },
-
-  { cat:'corea', emoji:'🔥', nombre:'Ramen Picante Buldak', origen:'Corea',
-    desc:'El reto viral de fideos extra picantes. Ten leche a la mano.',
-    precio:75, etiqueta:'Top ventas', tipo:'top', c1:'#FF6B6B', c2:'#FFC9C9' },
-
-  { cat:'corea', emoji:'🍯', nombre:'Honey Butter Chips', origen:'Corea',
-    desc:'Papas con miel y mantequilla. El snack dulce-salado más famoso.',
-    precio:98, etiqueta:'', tipo:'', c1:'#FFC93C', c2:'#FFF0B8' },
-
-  { cat:'usa', emoji:'🥜', nombre:'Reese’s Big Cup', origen:'Estados Unidos',
-    desc:'Chocolate con leche relleno de crema de cacahuate. Un clásico eterno.',
-    precio:59, etiqueta:'', tipo:'', c1:'#E08A3C', c2:'#FFD9A8' },
-
-  { cat:'usa', emoji:'🌈', nombre:'Nerds Gummy Clusters', origen:'Estados Unidos',
-    desc:'Gomita suave forrada de nerds crujientes. Textura brutal.',
-    precio:139, etiqueta:'Top ventas', tipo:'top', c1:'#A05CD6', c2:'#E4CBF7' },
-
-  { cat:'usa', emoji:'🍪', nombre:'Oreo Edición Limitada', origen:'Estados Unidos',
-    desc:'Sabores que solo salen unos meses al año. Pregunta por el del mes.',
-    precio:115, etiqueta:'Nuevo', tipo:'nuevo', c1:'#6E5A8C', c2:'#D6CDE8' },
-
-  { cat:'europa', emoji:'🥚', nombre:'Kinder Sorpresa Maxi', origen:'Italia',
-    desc:'Chocolate con leche y juguete coleccionable en versión grande.',
-    precio:129, etiqueta:'', tipo:'', c1:'#FF8A29', c2:'#FFD8AE' },
-
-  { cat:'europa', emoji:'🐻', nombre:'Haribo Alemán Original', origen:'Alemania',
-    desc:'Los ositos de oro de la receta europea. Se nota la diferencia.',
-    precio:95, etiqueta:'', tipo:'', c1:'#FFC93C', c2:'#FFF2C4' },
-
-  { cat:'europa', emoji:'🍮', nombre:'Toffifee Caja 15', origen:'Alemania',
-    desc:'Caramelo, avellana, crema de nuez y chocolate en un solo bocado.',
-    precio:149, etiqueta:'', tipo:'', c1:'#C98A5E', c2:'#F0DAC4' },
-
-  { cat:'bebidas', emoji:'🥤', nombre:'Ramune Original', origen:'Japón',
-    desc:'La soda de la canica. Divertida de abrir y refrescante de tomar.',
-    precio:69, etiqueta:'Top ventas', tipo:'top', c1:'#29B6E8', c2:'#BEEBFB' },
-
-  { cat:'bebidas', emoji:'🧋', nombre:'Milkis Melón', origen:'Corea',
-    desc:'Soda cremosa de yogurt con melón. Suave, burbujeante y distinta.',
-    precio:55, etiqueta:'Nuevo', tipo:'nuevo', c1:'#9FE08A', c2:'#E2F7D4' },
-
-  { cat:'bebidas', emoji:'🍊', nombre:'Fanta Sabores del Mundo', origen:'Europa / Asia',
-    desc:'Sabores que no existen en México: piña, sandía, manzana verde.',
-    precio:62, etiqueta:'', tipo:'', c1:'#FF6B35', c2:'#FFD1BB' },
-
-  { cat:'usa', emoji:'🍭', nombre:'Paleta Gigante Arcoíris', origen:'Estados Unidos',
-    desc:'La paleta espiral de 30 cm. Perfecta para fotos y para regalar.',
-    precio:99, etiqueta:'', tipo:'', c1:'#F42A8F', c2:'#7FDBFF' }
-];
-
-/* ---------------------------------------------------------
-   2. Render de productos
-   --------------------------------------------------------- */
-const grid = document.getElementById('products');
+const grid    = document.getElementById('products');
+const filtros = document.getElementById('filters');
 
 function waLink(texto){
   return 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(texto);
 }
 
+/* Escapa texto para poder inyectarlo en el HTML sin romper la tarjeta */
+function esc(txt){
+  return String(txt).replace(/[&<>"']/g, c => (
+    { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]
+  ));
+}
+
 function cardHTML(p){
   const tag = p.etiqueta
-    ? `<span class="tag ${p.tipo}">${p.etiqueta}</span>`
+    ? `<span class="tag ${esc(p.tipo)}">${esc(p.etiqueta)}</span>`
     : '';
   return `
-    <article class="card" data-cat="${p.cat}">
-      <div class="card-media" style="--c1:${p.c1};--c2:${p.c2}">
+    <article class="card" data-cat="${esc(p.cat)}">
+      <div class="card-media" style="--c1:${esc(p.c1)};--c2:${esc(p.c2)}">
         ${tag}
-        <span class="emoji">${p.emoji}</span>
+        <span class="emoji">${esc(p.emoji)}</span>
       </div>
       <div class="card-body">
-        <span class="card-origin">${p.origen}</span>
-        <h3>${p.nombre}</h3>
-        <p>${p.desc}</p>
+        <span class="card-origin">${esc(p.origen)}</span>
+        <h3>${esc(p.nombre)}</h3>
+        <p>${esc(p.desc)}</p>
         <div class="card-foot">
-          <span class="card-price">$${p.precio}</span>
-          <button class="card-btn" data-nombre="${p.nombre}">Lo quiero</button>
+          <span class="card-price">$${esc(p.precio)}</span>
+          <button class="card-btn" data-nombre="${esc(p.nombre)}">Lo quiero</button>
         </div>
       </div>
     </article>`;
 }
 
+function renderFiltros(){
+  if(!filtros) return;
+  filtros.innerHTML =
+    '<button class="filter active" data-filter="todos">Todos</button>' +
+    CATEGORIAS.map(c =>
+      `<button class="filter" data-filter="${esc(c.id)}">${esc(c.label)}</button>`
+    ).join('');
+}
+
 function renderProductos(filtro){
   if(!grid) return;
-  const lista = (filtro === 'todos')
-    ? PRODUCTOS
-    : PRODUCTOS.filter(p => p.cat === filtro);
+  const lista = CandyDB.porCategoria(filtro);
 
   grid.innerHTML = lista.length
     ? lista.map(cardHTML).join('')
     : '<p style="grid-column:1/-1;text-align:center;color:#6B5573">Pronto agregaremos productos de esta categoría 🍬</p>';
 }
 
+renderFiltros();
 renderProductos('todos');
 
 /* Filtros */
-const filtros = document.querySelectorAll('.filter');
-filtros.forEach(btn => {
-  btn.addEventListener('click', () => {
-    filtros.forEach(b => b.classList.remove('active'));
+if(filtros){
+  filtros.addEventListener('click', e => {
+    const btn = e.target.closest('.filter');
+    if(!btn) return;
+    filtros.querySelectorAll('.filter').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderProductos(btn.dataset.filter);
   });
-});
+}
 
 /* Botón "Lo quiero" de cada producto → WhatsApp */
 if(grid){
@@ -145,7 +93,7 @@ if(grid){
 }
 
 /* ---------------------------------------------------------
-   3. Menú móvil
+   2. Menú móvil
    --------------------------------------------------------- */
 const burger = document.getElementById('burger');
 const navLinks = document.getElementById('navLinks');
@@ -166,7 +114,7 @@ navLinks.querySelectorAll('a').forEach(a => {
 });
 
 /* ---------------------------------------------------------
-   4. Navbar con sombra + link activo + botón "subir"
+   3. Navbar con sombra + link activo + botón "subir"
    --------------------------------------------------------- */
 const navbar   = document.getElementById('navbar');
 const toTop    = document.getElementById('toTop');
@@ -192,7 +140,7 @@ onScroll();
 toTop.addEventListener('click', () => window.scrollTo({ top:0, behavior:'smooth' }));
 
 /* ---------------------------------------------------------
-   5. Animación de aparición al hacer scroll
+   4. Animación de aparición al hacer scroll
    --------------------------------------------------------- */
 const observer = new IntersectionObserver((entradas) => {
   entradas.forEach(en => {
@@ -206,7 +154,7 @@ const observer = new IntersectionObserver((entradas) => {
 document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
 /* ---------------------------------------------------------
-   6. Formulario de contacto → arma el mensaje de WhatsApp
+   5. Formulario de contacto → arma el mensaje de WhatsApp
    (Funciona en GitHub Pages sin servidor ni backend)
    --------------------------------------------------------- */
 const contactForm = document.getElementById('contactForm');
@@ -248,7 +196,7 @@ Mensaje: ${document.getElementById('mensaje').value.trim()}`;
 });
 
 /* ---------------------------------------------------------
-   7. Newsletter (demo, guarda el correo en el navegador)
+   6. Newsletter (demo, guarda el correo en el navegador)
    --------------------------------------------------------- */
 const newsForm = document.getElementById('newsletterForm');
 const newsMsg  = document.getElementById('newsMsg');
@@ -276,6 +224,6 @@ newsForm.addEventListener('submit', e => {
 });
 
 /* ---------------------------------------------------------
-   8. Año del footer
+   7. Año del footer
    --------------------------------------------------------- */
 document.getElementById('year').textContent = new Date().getFullYear();

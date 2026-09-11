@@ -7,8 +7,11 @@ Landing page responsiva para una tienda de **dulces de importación**, lista par
 ```
 candylandia-store/
 ├── index.html      ← la página completa
-├── styles.css      ← estilos y responsive
-├── script.js       ← catálogo, filtros, menú y formularios
+├── admin.html      ← panel de administración de productos
+├── styles.css      ← estilos y responsive (tienda + panel)
+├── productos.js    ← catálogo de productos (lo comparten la tienda y el panel)
+├── script.js       ← render de la tienda, filtros, menú y formularios
+├── admin.js        ← lógica del panel (alta, baja, exportar/importar)
 ├── .nojekyll       ← evita que GitHub Pages procese el sitio con Jekyll
 └── assets/
     ├── logo.png    ← logo de la marca
@@ -44,12 +47,37 @@ En 1–2 minutos el sitio queda en:
 |---|---|
 | Número de WhatsApp | `script.js` → `CONFIG.whatsapp` (formato `52` + 10 dígitos, sin `+` ni espacios) |
 | Nombre del negocio en los mensajes | `script.js` → `CONFIG.negocio` |
-| Productos (nombre, precio, país, descripción, emoji, colores) | `script.js` → arreglo `PRODUCTOS` |
-| Categorías de los filtros | botones `.filter` en `index.html` + campo `cat` de cada producto |
+| Productos (nombre, precio, país, descripción, emoji, colores) | **panel `admin.html`**, o a mano en `productos.js` → arreglo `PRODUCTOS_BASE` |
+| Categorías de los filtros | `productos.js` → arreglo `CATEGORIAS` (los botones de filtro se generan solos) |
+| Clave del panel de administración | `admin.js` → `ADMIN.clave` |
 | Correo, dirección y horarios | sección `#contacto` en `index.html` |
 | Redes sociales | bloque `.socials` en `index.html` (cambia los `href="#"`) |
 | Precios de las cajas sorpresa | sección `#cajas` en `index.html` (hoy comentada) |
 | Colores de la marca | `styles.css` → variables en `:root` |
+
+## 🛠️ Panel de administración
+
+Abre `admin.html` (también hay un enlace al final del footer de la tienda) para **agregar y quitar productos** sin tocar código. Usa exactamente el mismo diseño, colores y tarjetas que la tienda.
+
+- **Clave de acceso:** se configura en `admin.js` → `ADMIN.clave` (por defecto `candylandia2021`).
+- **Agregar:** llena el formulario (nombre, categoría, precio, país, emoji, descripción, etiqueta y colores) y verás una **vista previa en vivo** de la tarjeta antes de guardar. El producto queda al inicio del catálogo.
+- **Quitar:** pulsa la **✕** de cualquier tarjeta y confirma.
+- **Buscar:** filtra por nombre, país o categoría.
+- **Restaurar:** vuelve al catálogo original de `productos.js`.
+
+### 💾 Cómo se guardan los cambios
+
+El sitio es estático (GitHub Pages no tiene base de datos), así que los cambios del panel se guardan en el **`localStorage` del navegador donde los hiciste**. Los ve quien usa ese navegador, no el resto de los visitantes.
+
+Para publicarlos de verdad:
+
+1. En el panel pulsa **Exportar catálogo** y copia el JSON.
+2. Pégalo en `productos.js`, reemplazando el contenido del arreglo `PRODUCTOS_BASE`.
+3. Haz commit y push; GitHub Pages se actualiza solo.
+
+El botón **Importar** hace lo contrario: pega un JSON y reemplaza el catálogo de ese navegador (útil para pasar el catálogo de una computadora a otra).
+
+> ⚠️ La clave es solo una traba para entradas casuales: al ser un sitio estático, viaja dentro del JavaScript y cualquiera que revise el código puede leerla. No es una medida de seguridad real, y tampoco hace falta que lo sea: nadie puede modificar el sitio publicado desde el panel.
 
 ## 🙈 Sección oculta: Cajas sorpresa
 
@@ -71,6 +99,7 @@ También hay un testimonio cuyo texto original mencionaba la caja; quedó coment
 - Beneficios / propuesta de valor
 - **Nosotros** (historia, misión, visión, valores)
 - **Productos** con filtros por país y botón directo a WhatsApp
+- **Panel de administración** (`admin.html`) para dar de alta y baja productos
 - ~~Cajas sorpresa / suscripción mensual (3 planes)~~ *(comentada, ver arriba)*
 - Mayoreo para tiendas y revendedores
 - Testimonios

@@ -177,16 +177,11 @@
     </div>
 
     <div class="filters reveal" id="filters" aria-label="Filtrar productos por categoría">
-      <button class="filter active" data-filter="todos">Todos</button>
-      <button class="filter" data-filter="japon">🇯🇵 Japón</button>
-      <button class="filter" data-filter="corea">🇰🇷 Corea</button>
-      <button class="filter" data-filter="usa">🇺🇸 Estados Unidos</button>
-      <button class="filter" data-filter="europa">🇪🇺 Europa</button>
-      <button class="filter" data-filter="bebidas">🥤 Bebidas</button>
+      <!-- Los filtros se generan desde productos.js (CATEGORIAS) -->
     </div>
 
     <div class="products" id="products">
-      <!-- Los productos se generan desde script.js -->
+      <!-- Los productos se generan desde productos.js + script.js -->
     </div>
 
     <div class="products-cta reveal">
@@ -462,6 +457,7 @@
       <a href="#faq">Formas de pago</a>
       <a href="#faq">Devoluciones</a>
       <a href="#contacto">Soporte</a>
+      <a href="admin.html">Panel de administración</a>
     </div>
   </div>
   <div class="container footer-bottom">
@@ -477,6 +473,7 @@
 
 <button class="fab-top" id="toTop" aria-label="Volver arriba">↑</button>
 
+<script src="productos.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
