@@ -1,0 +1,96 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Candylandia Store
+#
+# Dos contenedores y nada más:
+#
+#   frontend  nginx con el SPA construido, escuchando dentro en el 1515
+#   backend   FastAPI con gunicorn, escuchando dentro en el 8000
+#
+# Postgres NO está aquí a propósito: corre en el host del VPS, compartido con
+# los otros sitios. Los contenedores llegan a él por host.docker.internal.
+#
+# Tampoco se publican el 80 ni el 443: esos son del nginx del host, que tiene
+# los certificados y reparte por dominio. Aquí solo se abre un puerto alto en
+# el loopback, que es a donde ese nginx reenvía.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  backend:
+    build:
+      context: ./backend
+    image: candylandia-backend:latest
+    container_name: candylandia-backend
+    restart: unless-stopped
+
+    env_file:
+      - .env
+
+    environment:
+      PUERTO_BACKEND: "8000"
+      GUNICORN_WORKERS: "${GUNICORN_WORKERS:-3}"
+
+    # La puerta al Postgres del host. Sin esto, DATABASE_URL apuntando a
+    # host.docker.internal no resuelve y el backend arranca a ciegas.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # Las fotos que se suben desde el panel. Va a una carpeta del host (y no
+      # a un volumen con nombre) para que `deploy.sh --respaldo` pueda
+      # copiarlas con tar sin entrar al contenedor, y para poder mirarlas con
+      # ls cuando algo se ve raro.
+      - ./datos/media:/app/media
+
+    # Sin `ports`: al backend solo se llega desde el contenedor del front, por
+    # la red interna. Publicarlo sería abrir el API sin el nginx delante.
+    expose:
+      - "8000"
+
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        # Sin límite, los logs de cuatro sitios se comen el disco del VPS
+        # despacito y sin avisar.
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: ./frontend
+    image: candylandia-frontend:latest
+    container_name: candylandia-frontend
+    restart: unless-stopped
+
+    # 127.0.0.1 delante del puerto NO es decorativo: sin eso, Docker abre el
+    # puerto en todas las interfaces y cualquiera puede saltarse el nginx del
+    # host (y con él, el HTTPS) entrando por http://IP:8520.
+    ports:
+      - "127.0.0.1:${APP_PORT:-8520}:1515"
+
+    depends_on:
+      backend:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:1515/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# La red por defecto que crea compose ya sirve: los dos contenedores se ven
+# por nombre (`backend`, `frontend`) y nadie de fuera entra.

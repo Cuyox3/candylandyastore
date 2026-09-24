@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Candylandia Store
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Lo que NUNCA puede acabar en el repositorio ─────────────────────────────
+# El .env lleva la contraseña de Postgres y la clave que firma las sesiones del
+# panel. Quien tenga esa clave puede fabricarse un token de administrador.
+# La plantilla (.env.example) sí va a git; el .env de verdad no.
+.env
+.env.*
+!.env.example
+
+# ── Datos de producción ─────────────────────────────────────────────────────
+# Las fotos que sube la gente desde el panel y los volcados de la base. Viven
+# en la VPS; el repositorio no es sitio para ellos.
+datos/
+backups/
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+dist/
+*.local
+npm-debug.log*
+
+# ── Sistema y editores ──────────────────────────────────────────────────────
+.DS_Store
+*.swp
+.idea/
+.vscode/
