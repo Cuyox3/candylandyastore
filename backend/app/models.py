@@ -8,8 +8,19 @@ pinte exactamente igual sin traducir nada por el camino.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text, func
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import Optional
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 
@@ -45,7 +56,11 @@ class Producto(Base):
 
     cat: Mapped[str] = mapped_column(String(40), index=True)
     emoji: Mapped[str] = mapped_column(String(8), default="🍬")
-    # Ruta pública de la foto ('/media/productos/xxx.webp'). Vacío = emoji.
+    # Dónde mira la tarjeta para pintar la foto: '/api/v1/fotos/<slug>?v=…',
+    # que sirve la fila de `fotos`. Vacío = la tarjeta enseña el emoji.
+    # Sigue aceptando una ruta suelta ('/media/productos/xxx.webp') para no
+    # romper los productos que se guardaran antes de que las fotos pasaran a
+    # la base.
     img: Mapped[str] = mapped_column(String(255), default="")
     nombre: Mapped[str] = mapped_column(String(120))
     origen: Mapped[str] = mapped_column(String(60), default="")
@@ -66,6 +81,59 @@ class Producto(Base):
     actualizado: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_ahora, onupdate=_ahora
     )
+
+    # La foto vive aquí colgada, no en disco. `delete-orphan` para que
+    # quitarla del producto (producto.foto = None) borre también la fila, y
+    # `passive_deletes` para no estorbar al ON DELETE CASCADE cuando el borrado
+    # lo hace Postgres —que es lo que pasa al importar un catálogo, donde los
+    # productos se van con un DELETE de golpe y sin pasar por el ORM.
+    foto: Mapped[Optional["Foto"]] = relationship(
+        back_populates="producto",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        uselist=False,
+    )
+
+
+class Foto(Base):
+    """
+    La foto de un producto, guardada en la base y no en el disco.
+
+    Antes el WebP se escribía en MEDIA_ROOT y el producto guardaba la ruta.
+    Eso obliga a respaldar dos cosas —la base y una carpeta— y a no
+    equivocarse: un pg_dump restaurado sin su carpeta deja el catálogo con las
+    tarjetas rotas. Y al borrar un producto había que acordarse de borrar el
+    archivo, cosa que no pasaba: quedaban huérfanos para siempre.
+
+    En base64 y no en `bytea` a propósito: es lo que come la etiqueta <img>
+    (`data:image/webp;base64,…`), es lo que sube el panel y es lo que
+    sobrevive a cualquier volcado en texto sin pelearse con la codificación.
+    Ocupa un tercio más; a 40 KB por foto ya reducida, da igual.
+    """
+
+    __tablename__ = "fotos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Único: una foto por producto, la de la tarjeta. El CASCADE es de la base
+    # (no del ORM) para que la foto caiga también cuando el producto se borra
+    # con un DELETE masivo.
+    producto_id: Mapped[int] = mapped_column(
+        ForeignKey("productos.id", ondelete="CASCADE"), unique=True, index=True
+    )
+
+    mime: Mapped[str] = mapped_column(String(40), default="image/webp")
+    datos: Mapped[str] = mapped_column(Text)  # base64 pelado, sin el 'data:…,'
+    peso: Mapped[int] = mapped_column(Integer, default=0)  # bytes ya comprimidos
+    ancho: Mapped[int] = mapped_column(Integer, default=0)
+    alto: Mapped[int] = mapped_column(Integer, default=0)
+    # Ocho hex del sha256 del WebP. Va en la URL (?v=) y en el ETag: la
+    # dirección de la foto no cambia en toda la vida del producto, así que sin
+    # esto el navegador se quedaría con la foto vieja para siempre.
+    huella: Mapped[str] = mapped_column(String(16), default="")
+
+    creado: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_ahora)
+
+    producto: Mapped["Producto"] = relationship(back_populates="foto")
 
 
 class Usuario(Base):

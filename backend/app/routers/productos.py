@@ -8,10 +8,11 @@ ruta de escritura sin candado.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from .. import fotos as fotos_lib
 from ..database import obtener_db
-from ..models import Categoria, Producto, Usuario
+from ..models import Categoria, Foto, Producto, Usuario
 from ..schemas import (
     CatalogoImportar,
     CategoriaBase,
@@ -148,11 +149,17 @@ def crear_producto(
     minimo = db.query(Producto.orden).order_by(Producto.orden).limit(1).scalar()
     orden = (minimo - 1) if minimo is not None else 0
 
+    campos = datos.model_dump()
+    # La foto llega entera («data:image/webp;base64,…») y no cabe en la
+    # columna: `aplicar` la guarda en `fotos` y deja en `img` su dirección.
+    img = campos.pop("img", "")
+
     producto = Producto(
         slug=slug_libre(db, Producto, datos.nombre),
         orden=orden,
-        **datos.model_dump(),
+        **campos,
     )
+    fotos_lib.aplicar(producto, img)
     db.add(producto)
     db.commit()
     db.refresh(producto)
@@ -174,8 +181,15 @@ def editar_producto(
     if "cat" in cambios and not _existe_categoria(db, cambios["cat"]):
         raise HTTPException(status_code=400, detail=f"La categoría «{cambios['cat']}» no existe.")
 
+    # Fuera del bucle: `img` no se copia al producto, se interpreta. Puede ser
+    # una foto nueva, la misma de antes o el vacío de quien le dio a «Quitar
+    # foto», y cada caso toca la tabla `fotos` de una manera.
+    foto = cambios.pop("img", None)
+
     for campo, valor in cambios.items():
         setattr(producto, campo, valor)
+
+    fotos_lib.aplicar(producto, foto)
 
     # El slug NO cambia aunque cambie el nombre: es el id que la tienda ya
     # tiene en la mano, y renombrarlo rompería cualquier enlace guardado.
@@ -202,15 +216,32 @@ def quitar_producto(
 
 @router.get("/catalogo/exportar")
 def exportar_catalogo(
+    fotos: bool = Query(True, description="incrustar las fotos en base64"),
     db: Session = Depends(obtener_db),
     _: Usuario = Depends(admin_actual),
 ):
     """
     El catálogo entero en JSON. Es el respaldo que uno se lleva antes de
     tocar nada, y lo que come `/catalogo/importar`.
+
+    Las fotos van dentro, en base64. Abultan —es el archivo entero y no una
+    dirección—, pero un respaldo que al restaurarse deja todas las tarjetas
+    con el emoji no es un respaldo, y con `?fotos=0` el JSON sólo vale para
+    reimportarlo en ESTE servidor, donde las fotos siguen en la base y se
+    reconocen por el id del producto.
     """
-    filas = db.query(Producto).order_by(Producto.orden, Producto.id).all()
-    return [_salida(p).model_dump(exclude={"creado"}) for p in filas]
+    consulta = db.query(Producto)
+    if fotos:
+        # Sin esto, una consulta por producto para traerse su foto.
+        consulta = consulta.options(joinedload(Producto.foto))
+
+    salida = []
+    for p in consulta.order_by(Producto.orden, Producto.id).all():
+        fila = _salida(p).model_dump(exclude={"creado"})
+        if fotos and p.foto is not None:
+            fila["img"] = fotos_lib.data_url(p.foto)
+        salida.append(fila)
+    return salida
 
 
 @router.post("/catalogo/importar", response_model=Respuesta)
@@ -228,7 +259,7 @@ def importar_catalogo(
 
     El `id` de cada producto se respeta si viene en el JSON y está libre, para
     que exportar e importar no le cambie la identidad a los dulces; si falta o
-    choca, se genera desde el nombre.
+    choca, se genera desde el nombre. Las fotos se conservan por ese mismo id.
 
     ⚠️ Borra todos los productos actuales. La confirmación se pide en el panel;
     aquí se valida ANTES de borrar nada: si el JSON trae una categoría que no
@@ -246,6 +277,35 @@ def importar_catalogo(
             detail="Categorías que no existen: " + ", ".join(sorted(faltan)),
         )
 
+    # Las fotos se van con sus productos en el DELETE de abajo (ON DELETE
+    # CASCADE). Pero el JSON que se importa casi siempre es el que salió de
+    # `/catalogo/exportar`, donde `img` es una dirección y no la foto: sin
+    # apartarlas antes, reimportar el catálogo propio dejaría todas las
+    # tarjetas con el emoji. Se copian en memoria y se devuelven al producto
+    # que tenga el mismo slug.
+    #
+    # Se guardan los valores, no las filas: en cuanto corra el DELETE, un
+    # objeto Foto del ORM que intentara recargarse no encontraría su fila.
+    guardadas = {
+        fila.slug: {
+            "mime": fila.mime,
+            "datos": fila.datos,
+            "peso": fila.peso,
+            "ancho": fila.ancho,
+            "alto": fila.alto,
+            "huella": fila.huella,
+        }
+        for fila in db.query(
+            Producto.slug,
+            Foto.mime,
+            Foto.datos,
+            Foto.peso,
+            Foto.ancho,
+            Foto.alto,
+            Foto.huella,
+        ).join(Foto, Foto.producto_id == Producto.id)
+    }
+
     db.query(Producto).delete()
     db.flush()  # que el DELETE corra antes que los INSERT, por el índice único
 
@@ -253,13 +313,22 @@ def importar_catalogo(
     for i, entrada in enumerate(entradas):
         slug = slug_en_lote(entrada.id, entrada.nombre, usados)
         usados.add(slug)
-        db.add(
-            Producto(
-                slug=slug,
-                orden=i,
-                **entrada.model_dump(exclude={"id"}),
-            )
+
+        producto = Producto(
+            slug=slug,
+            orden=i,
+            **entrada.model_dump(exclude={"id", "img"}),
         )
+
+        if not entrada.img.startswith("data:") and slug in guardadas:
+            producto.foto = Foto(**guardadas[slug])
+            producto.img = fotos_lib.ruta(slug, producto.foto)
+        else:
+            # Un `data:` en el JSON (hecho a mano, o venido de otro servidor)
+            # entra como foto nueva; cualquier otra cosa se guarda tal cual.
+            fotos_lib.aplicar(producto, entrada.img)
+
+        db.add(producto)
 
     db.commit()
     return Respuesta(detalle=f"Catálogo reemplazado: {len(entradas)} producto(s).")

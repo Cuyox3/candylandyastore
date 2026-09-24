@@ -1,8 +1,9 @@
 """
 Candylandia Store — API.
 
-    /api/v1/…        el API (catálogo, acceso, formularios de la tienda)
-    /media/…         las fotos subidas desde el panel
+    /api/v1/…        el API (catálogo, acceso, formularios de la tienda,
+                     y las fotos, que van dentro de la base)
+    /media/…         fotos en disco de antes de que se guardaran en la base
     /healthz         la sonda que usa deploy.sh para saber si esto vive
     /api/docs        la documentación interactiva (sólo con DEBUG=True)
 
@@ -137,6 +138,7 @@ PREFIJO = "/api/v1"
 app.include_router(auth.router, prefix=PREFIJO)
 app.include_router(productos.router, prefix=PREFIJO)
 app.include_router(imagenes.router, prefix=PREFIJO)
+app.include_router(imagenes.publicas, prefix=PREFIJO)
 app.include_router(tienda.router, prefix=PREFIJO)
 
 
@@ -172,9 +174,10 @@ def configuracion():
 
 
 # ── Archivos subidos ───────────────────────────────────────────────────────
-# En la VPS los sirve el nginx del host desde el disco y esta ruta no se usa;
-# se monta igualmente para que en desarrollo (uvicorn a secas) las fotos se
-# vean sin montar nginx.
+# Las fotos nuevas NO pasan por aquí: viven en la tabla `fotos` y las sirve
+# /api/v1/fotos/{slug}. Esto se queda montado por los productos que se
+# guardaran antes del cambio, que tienen en `img` una ruta a /media y se
+# quedarían sin foto si la carpeta dejara de servirse.
 _media = ajustes.MEDIA_ROOT
 try:
     import mimetypes

@@ -10,6 +10,8 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from .config import ajustes
+
 
 # ── Productos ──────────────────────────────────────────────────────────────
 
@@ -30,6 +32,32 @@ def _color_hex(v: str) -> str:
     return v.upper()
 
 
+# Lo que puede ocupar un `data:` en el campo `img`: el tope de subida más el
+# tercio que engorda al pasar a base64, y algo de holgura para la cabecera.
+# Es el mismo límite que aplica el endpoint de subida, para que una foto que
+# el panel acepta no la rechace después el guardado del producto.
+_DATA_URL_MAX = ajustes.IMAGEN_PESO_MAX * 4 // 3 + 128
+
+
+def _img_valida(v: str) -> str:
+    """
+    `img` admite dos formas y cada una tiene su tope.
+
+    Una ruta ('/api/v1/fotos/p-algo?v=1a2b3c4d') cabe en la columna, que es de
+    255. Una foto recién subida llega entera en base64 y ocupa lo que ocupe:
+    el servidor la convierte en fila de `fotos` antes de guardar el producto,
+    y lo que acaba en la columna vuelve a ser una ruta. Sin esta distinción,
+    un `max_length=255` a secas rechaza cualquier foto.
+    """
+    if v.startswith("data:"):
+        if len(v) > _DATA_URL_MAX:
+            raise ValueError("La foto es demasiado grande. Usa una más ligera.")
+        return v
+    if len(v) > 255:
+        raise ValueError("La dirección de la foto es demasiado larga.")
+    return v.strip()
+
+
 class ProductoBase(BaseModel):
     nombre: str = Field(min_length=1, max_length=120)
     cat: str = Field(min_length=1, max_length=40)
@@ -41,7 +69,7 @@ class ProductoBase(BaseModel):
     tipo: str = Field(default="", max_length=20)
     c1: str = Field(default="#F42A8F", max_length=9)
     c2: str = Field(default="#FFB8DC", max_length=9)
-    img: str = Field(default="", max_length=255)
+    img: str = Field(default="")
     activo: bool = True
 
     @field_validator("nombre", "origen", "desc", "etiqueta")
@@ -53,6 +81,11 @@ class ProductoBase(BaseModel):
     @classmethod
     def _color_valido(cls, v: str) -> str:
         return _color_hex(v)
+
+    @field_validator("img")
+    @classmethod
+    def _img_razonable(cls, v: str) -> str:
+        return _img_valida(v)
 
 
 class ProductoCrear(ProductoBase):
@@ -72,7 +105,7 @@ class ProductoEditar(BaseModel):
     tipo: Optional[str] = Field(default=None, max_length=20)
     c1: Optional[str] = Field(default=None, max_length=9)
     c2: Optional[str] = Field(default=None, max_length=9)
-    img: Optional[str] = Field(default=None, max_length=255)
+    img: Optional[str] = Field(default=None)
     activo: Optional[bool] = None
     orden: Optional[int] = None
 
@@ -80,6 +113,11 @@ class ProductoEditar(BaseModel):
     @classmethod
     def _color_valido(cls, v):
         return _color_hex(v)
+
+    @field_validator("img")
+    @classmethod
+    def _img_razonable(cls, v):
+        return v if v is None else _img_valida(v)
 
 
 class ProductoSalida(ProductoBase):
@@ -189,7 +227,7 @@ class Respuesta(BaseModel):
 
 
 class SubidaImagen(BaseModel):
-    img: str          # ruta pública, lista para guardar en el producto
-    peso: int         # bytes del archivo ya comprimido
+    img: str          # 'data:image/webp;base64,…', listo para el <img> y para guardar
+    peso: int         # bytes del WebP comprimido (el base64 abulta un tercio más)
     ancho: int
     alto: int

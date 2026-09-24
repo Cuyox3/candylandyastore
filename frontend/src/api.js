@@ -141,8 +141,8 @@ export const api = {
     /* Sin Content-Type: lo pone el navegador con el boundary del multipart.
        Escribirlo a mano rompe la subida de una forma difícil de ver. */
     return peticion('/imagenes', { method:'POST', autenticada:true, formulario });
-  },
-
-  borrarImagen: (ruta) =>
-    peticion(`/imagenes?ruta=${encodeURIComponent(ruta)}`, { method:'DELETE', autenticada:true })
+  }
+  /* No hay borrarImagen: la foto es una fila colgada del producto, así que se
+     quita guardando el producto con img vacío y se borra sola cuando el
+     producto se borra. */
 };

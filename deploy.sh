@@ -87,6 +87,10 @@ RUTA_SALUD="/healthz"
 # Tamaño máximo de subida. Va por encima del IMAGEN_PESO_MAX del backend (8 MB)
 # a propósito: así, cuando alguien sube una foto enorme, el que contesta es el
 # backend con un mensaje en castellano y no nginx con un 413 pelado.
+#
+# Es también el techo de «Importar catálogo», que ahora lleva las fotos dentro
+# del JSON en base64: a unos 40 KB por foto, con 12M caben del orden de
+# doscientas. Un catálogo más grande que eso pide subir este número.
 SUBIDA_MAXIMA="12M"
 # Puerto interno del contenedor frontend. No se publica: Docker lo mapea a
 # 127.0.0.1:APP_PORT.
@@ -225,12 +229,13 @@ hook_estado() {
     || warn "  no se pudo consultar (¿está el backend abajo?)."
 
   log "Fotos de los productos:"
-  if [ -d "$DIR_MEDIOS" ]; then
-    log "  $DIR_MEDIOS · $(du -sh "$DIR_MEDIOS" 2>/dev/null | cut -f1) · $(find "$DIR_MEDIOS" -type f 2>/dev/null | wc -l | tr -d ' ') archivo(s)"
-    log "  Van en el respaldo (media-*.tar.gz). Sin ellas, las tarjetas vuelven"
-    log "    a enseñar el emoji del producto."
-  else
-    warn "  la carpeta no existe todavía: nadie ha subido ninguna foto."
+  log "  Están en la base, en la tabla «fotos», una por producto y en base64."
+  log "  Van dentro del volcado (db-*.sql.gz), así que restaurarlo las devuelve"
+  log "    todas. No hay carpeta que copiar aparte."
+  if [ -d "$DIR_MEDIOS" ] && [ -n "$(ls -A "$DIR_MEDIOS" 2>/dev/null)" ]; then
+    log "  Quedan además $(find "$DIR_MEDIOS" -type f 2>/dev/null | wc -l | tr -d ' ') archivo(s) sueltos en $DIR_MEDIOS"
+    log "    ($(du -sh "$DIR_MEDIOS" 2>/dev/null | cut -f1)): fotos de antes del cambio. Se siguen sirviendo y se"
+    log "    siguen respaldando (media-*.tar.gz)."
   fi
 }
 
@@ -796,9 +801,10 @@ respaldar_db() {
     return 1
   fi
 
-  # Las fotos pesan mucho más que la base: van en su propio archivo. Y son lo
-  # único del sitio que no se puede rehacer desde el código: el catálogo se
-  # vuelve a sembrar, pero una foto que subió alguien hace seis meses no.
+  # Las fotos de ahora viajan dentro del volcado de arriba, en la tabla
+  # «fotos». Esto es sólo para las que quedaran en disco de antes del cambio:
+  # mientras haya productos apuntando a /media, siguen siendo lo único del
+  # sitio que no se puede rehacer desde el código.
   if [ -d "$DIR_MEDIOS" ] && [ -n "$(ls -A "$DIR_MEDIOS" 2>/dev/null)" ]; then
     local medios="$BACKUP_DIR/media-$sello.tar.gz"
     tar czf "$medios" -C "$(dirname "$DIR_MEDIOS")" "$(basename "$DIR_MEDIOS")" 2>/dev/null \
