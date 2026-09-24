@@ -99,10 +99,22 @@ class ProductoSalida(ProductoBase):
         return float(v) if v is not None else 0.0
 
 
+class ProductoImportar(ProductoCrear):
+    """
+    Un producto tal y como sale de `/catalogo/exportar`.
+
+    El `id` (que es el slug) viaja de vuelta para poder conservarlo al
+    restaurar. Es opcional: un JSON escrito a mano puede no traerlo, y
+    entonces el slug se saca del nombre como al crear desde el panel.
+    """
+
+    id: str = Field(default="", max_length=60)
+
+
 class CatalogoImportar(BaseModel):
     """Reemplaza el catálogo entero con el JSON que exporta el panel."""
 
-    productos: list[ProductoCrear]
+    productos: list[ProductoImportar]
 
 
 # ── Categorías ─────────────────────────────────────────────────────────────

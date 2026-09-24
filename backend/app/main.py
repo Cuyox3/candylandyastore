@@ -107,6 +107,15 @@ def _en_castellano(error: dict) -> str:
     # value_error lleva el texto de nuestros propios validadores, que ya está
     # en castellano; Pydantic le antepone "Value error, " y sobra.
     msg = str(error["msg"]).replace("Value error, ", "")
+
+    # El único value_error que NO es nuestro: el de EmailStr, que viene en
+    # inglés desde email-validator y acaba en el formulario de contacto y en
+    # el del boletín ("value is not valid email address: An email address
+    # must have an @-sign."). El texto exacto cambia entre versiones de
+    # pydantic, así que se busca por «email address» y no por la frase entera.
+    if "email address" in msg.lower():
+        return f"{etiqueta} no parece una dirección válida."
+
     texto = plantilla.format(
         limite=ctx.get("gt", ctx.get("le", ctx.get("max_length", ctx.get("min_length", "")))),
         msg=msg,
@@ -168,7 +177,13 @@ def configuracion():
 # vean sin montar nginx.
 _media = ajustes.MEDIA_ROOT
 try:
+    import mimetypes
     import os
+
+    # La imagen `python:3.12-slim` no trae /etc/mime.types y la tabla que lleva
+    # Python dentro no conoce WebP hasta la 3.13. Sin esta línea, TODAS las
+    # fotos (que se guardan en WebP) salen con «Content-Type: text/plain».
+    mimetypes.add_type("image/webp", ".webp")
 
     os.makedirs(_media, exist_ok=True)
     app.mount(ajustes.MEDIA_URL, StaticFiles(directory=_media), name="media")
@@ -177,6 +192,10 @@ except OSError as err:
 
 
 # ── Arranque ───────────────────────────────────────────────────────────────
+# Clave del cerrojo que se reparten los workers al arrancar (ver más abajo).
+CERROJO_ARRANQUE = 4820251
+
+
 @app.on_event("startup")
 def al_arrancar():
     """
@@ -189,7 +208,7 @@ def al_arrancar():
     from .database import Base  # noqa: F401 - registra los modelos
     from . import models  # noqa: F401
     from .seed import sembrar
-    from .models import Usuario
+    from .models import Categoria, Producto, Usuario
     from .security import cifrar
 
     ultimo = None
@@ -206,31 +225,69 @@ def al_arrancar():
         log.error("Postgres no respondió: %s", ultimo)
         raise SystemExit(1)
 
-    # `create_all` en vez de migraciones: el esquema son cinco tablas y no hay
-    # histórico que conservar. Si el modelo crece, Alembic ya está instalado.
-    Base.metadata.create_all(bind=motor)
+    # Este arranque corre en CADA worker de gunicorn, a la vez. Crear las
+    # tablas y sembrar el catálogo en paralelo termina con dos workers
+    # haciendo el mismo INSERT y el segundo muriendo con
+    #   duplicate key value violates unique constraint "ix_categorias_slug"
+    # que para gunicorn es "worker failed to boot" y tira el contenedor
+    # entero. Pasa sólo con la base vacía, o sea: en el primer despliegue.
+    #
+    # El cerrojo de Postgres (que es del servidor, no del proceso) deja pasar
+    # a uno; los demás esperan aquí y, cuando entran, ya no hay nada que
+    # sembrar. El número da igual mientras sea el mismo en todos.
+    with motor.connect().execution_options(isolation_level="AUTOCOMMIT") as cerrojo:
+        cerrojo.execute(text("SELECT pg_advisory_lock(:clave)"), {"clave": CERROJO_ARRANQUE})
+        try:
+            # `create_all` en vez de migraciones: el esquema son cinco tablas y
+            # no hay histórico que conservar. Si el modelo crece, Alembic ya
+            # está instalado.
+            Base.metadata.create_all(bind=motor)
 
-    with SesionLocal() as db:
-        cats, prods = sembrar(db)
-        if cats or prods:
-            log.info("Catálogo sembrado: %s categoría(s), %s producto(s).", cats, prods)
+            with SesionLocal() as db:
+                # Sólo en una base virgen.
+                #
+                # Antes se sembraba en CADA arranque. Como `sembrar` decide
+                # producto a producto —si no encuentra el slug, lo mete—, un
+                # simple reinicio del contenedor devolvía a la tienda los
+                # dulces que el dueño había quitado desde el panel. Y si el
+                # catálogo se había reemplazado por uno propio (los slugs ya
+                # no son los de fábrica), el arranque le añadía encima los 16
+                # productos de ejemplo.
+                #
+                # Si la base ya tiene algo, el catálogo es del dueño. Para
+                # volver al de fábrica están el botón del panel y
+                # `./deploy.sh --sembrar --forzar`.
+                virgen = (
+                    db.query(Producto).count() == 0
+                    and db.query(Categoria).count() == 0
+                )
+                if virgen:
+                    cats, prods = sembrar(db)
+                    if cats or prods:
+                        log.info(
+                            "Base vacía: catálogo sembrado con %s categoría(s) y %s producto(s).",
+                            cats,
+                            prods,
+                        )
 
-        # El administrador del panel. Sólo se crea si no hay ninguno: la
-        # contraseña del .env NO pisa la de un usuario que ya existe, porque
-        # entonces cambiarla desde el panel no serviría de nada.
-        if db.query(Usuario).count() == 0:
-            if not ajustes.ADMIN_PASSWORD:
-                log.warning(
-                    "No hay usuarios y ADMIN_PASSWORD está vacía: nadie puede "
-                    "entrar al panel. Créalo con  ./deploy.sh --admin"
-                )
-            else:
-                db.add(
-                    Usuario(
-                        usuario=ajustes.ADMIN_USUARIO.strip().lower(),
-                        email=ajustes.ADMIN_EMAIL,
-                        password_hash=cifrar(ajustes.ADMIN_PASSWORD),
-                    )
-                )
-                db.commit()
-                log.info("Usuario administrador «%s» creado.", ajustes.ADMIN_USUARIO)
+                # El administrador del panel. Sólo se crea si no hay ninguno: la
+                # contraseña del .env NO pisa la de un usuario que ya existe, porque
+                # entonces cambiarla desde el panel no serviría de nada.
+                if db.query(Usuario).count() == 0:
+                    if not ajustes.ADMIN_PASSWORD:
+                        log.warning(
+                            "No hay usuarios y ADMIN_PASSWORD está vacía: nadie puede "
+                            "entrar al panel. Créalo con  ./deploy.sh --admin"
+                        )
+                    else:
+                        db.add(
+                            Usuario(
+                                usuario=ajustes.ADMIN_USUARIO.strip().lower(),
+                                email=ajustes.ADMIN_EMAIL,
+                                password_hash=cifrar(ajustes.ADMIN_PASSWORD),
+                            )
+                        )
+                        db.commit()
+                        log.info("Usuario administrador «%s» creado.", ajustes.ADMIN_USUARIO)
+        finally:
+            cerrojo.execute(text("SELECT pg_advisory_unlock(:clave)"), {"clave": CERROJO_ARRANQUE})

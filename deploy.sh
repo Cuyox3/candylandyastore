@@ -50,7 +50,9 @@ PROYECTO="candylandia"               # prefija contenedores, red y stack de comp
 NOMBRE="Candylandia Store"
 APP_DIR="$RAIZ"
 
-DOMINIO_DEFECTO="candylandia.cuyox3.com"
+# El mismo dominio que el CNAME del repositorio, para que la tienda no cambie
+# de dirección al pasar de GitHub Pages a la VPS.
+DOMINIO_DEFECTO="candylandiastore.mx"
 # Puerto loopback asignado a este proyecto en la VPS. El mapa completo está en
 # `mapa_de_puertos` (más abajo) y en ARQUITECTURA.md. NO reutilices otro.
 APP_PORT_DEFECTO=8520
@@ -698,6 +700,26 @@ comprobar_acceso_postgres() {
     warn "    host    all    all    ${subred}    scram-sha-256"
     warn "y recarga:  systemctl reload postgresql"
   fi
+
+  comprobar_cliente_postgres
+}
+
+# pg_dump se niega a volcar un servidor MÁS NUEVO que él. Eso no se nota al
+# desplegar: se nota el día del `--respaldo`, que es el día que menos apetece
+# descubrirlo. Así que se avisa aquí, con el arreglo escrito.
+comprobar_cliente_postgres() {
+  local servidor cliente
+  servidor="$(psql_admin 'SHOW server_version' | cut -d. -f1 | tr -dc '0-9')"
+  cliente="$(pg_dump --version 2>/dev/null | awk '{print $NF}' | cut -d. -f1 | tr -dc '0-9')"
+  [ -n "$servidor" ] && [ -n "$cliente" ] || return 0
+
+  if [ "$cliente" -lt "$servidor" ]; then
+    warn "El pg_dump del host es la versión ${cliente} y Postgres la ${servidor}:"
+    warn "los respaldos fallarían con «aborting because of server version mismatch»."
+    warn "Instala el cliente que toca:  apt install postgresql-client-${servidor}"
+  else
+    ok "Cliente de Postgres ${cliente} para un servidor ${servidor}: sirve para respaldar."
+  fi
 }
 
 instrucciones_base() {
@@ -715,12 +737,32 @@ instrucciones_base() {
 }
 
 # ── Respaldo y restauración ─────────────────────────────────────────────────
-# pg_dump se ejecuta DENTRO del contenedor del backend, que es quien tiene la
-# URL de la base y el cliente. Así funciona igual esté Postgres en el host o
-# donde sea.
+# El volcado se intenta primero con el pg_dump DEL HOST y, si no lo hay, con el
+# del contenedor del backend.
+#
+# El orden importa: el cliente de la imagen viene de Debian y se queda atrás
+# (hoy, 17), mientras que en el host manda la versión del servidor. Contra un
+# Postgres 18 el cliente viejo no avisa, aborta:
+#     pg_dump: error: aborting because of server version mismatch
+# y el respaldo se queda sin hacer justo antes de una actualización. El pg_dump
+# del host sale de la misma instalación que sirve la base, así que siempre
+# cuadra.
 #
 # ⚠️ pg_dump NO entiende el prefijo `postgresql+psycopg://` que necesita
-# SQLAlchemy: hay que quitarle el `+psycopg` antes de pasárselo.
+# SQLAlchemy: hay que quitarle el `+psycopg` antes de pasárselo. Y desde el host
+# tampoco vale `host.docker.internal`, que sólo resuelve dentro del contenedor.
+# --clean --if-exists: sin ellas, restaurar encima de una base que YA tiene el
+#   esquema (que es justo lo que hace `--rollback`) suelta 27 errores de
+#   "relation ... already exists" y deja los COPY a medias. Con ellas, el mismo
+#   volcado se restaura sin un solo error.
+# --no-owner --no-privileges: el volcado no arrastra al rol que lo creó, así
+#   que se puede restaurar en otra VPS donde el dueño se llame distinto.
+PGDUMP_OPCIONES="--clean --if-exists --no-owner --no-privileges"
+
+url_base_host() {
+  printf "%s" "${DATABASE_URL:-}" \
+    | sed -e "s|+psycopg||" -e "s|@host.docker.internal:|@127.0.0.1:|"
+}
 respaldar_db() {
   mkdir -p "$BACKUP_DIR"
   local sello destino
@@ -732,12 +774,25 @@ respaldar_db() {
     return 0
   fi
 
-  if $COMPOSE exec -T "$SERVICIO_WEB" sh -lc \
-       'pg_dump "$(printf "%s" "$DATABASE_URL" | sed "s|+psycopg||")"' 2>/dev/null | gzip > "$destino"; then
+  local volcado=0
+  if command -v pg_dump >/dev/null 2>&1 && [ -n "${DATABASE_URL:-}" ]; then
+    pg_dump $PGDUMP_OPCIONES "$(url_base_host)" 2>/dev/null | gzip > "$destino" && volcado=1
+  fi
+
+  if [ "$volcado" -eq 0 ]; then
+    $COMPOSE exec -T -e "PGDUMP_OPCIONES=$PGDUMP_OPCIONES" "$SERVICIO_WEB" sh -lc \
+      'pg_dump $PGDUMP_OPCIONES "$(printf "%s" "$DATABASE_URL" | sed "s|+psycopg||")"' 2>/dev/null \
+      | gzip > "$destino" && volcado=1
+  fi
+
+  if [ "$volcado" -eq 1 ]; then
     ok "Base respaldada: $(basename "$destino") ($(du -h "$destino" | cut -f1))"
   else
     rm -f "$destino"
-    err "pg_dump falló. Revisa DATABASE_URL en el .env y que el contenedor tenga pg_dump."
+    err "pg_dump falló en el host y en el contenedor. Revisa DATABASE_URL en el"
+    err "  .env y que el cliente no sea MÁS VIEJO que el servidor:"
+    err "      pg_dump --version"
+    err "      sudo -u postgres psql -tAc 'show server_version'"
     return 1
   fi
 
@@ -775,8 +830,13 @@ rollback_db() {
   respaldar_db || warn "No se pudo respaldar la base actual; se continúa."
 
   log "Restaurando…"
-  gunzip -c "$ultimo" | $COMPOSE exec -T "$SERVICIO_WEB" sh -lc \
-    'psql "$(printf "%s" "$DATABASE_URL" | sed "s|+psycopg||")"' >/dev/null
+  # Mismo criterio que el volcado: el psql del host primero.
+  if command -v psql >/dev/null 2>&1 && [ -n "${DATABASE_URL:-}" ]; then
+    gunzip -c "$ultimo" | psql "$(url_base_host)" >/dev/null
+  else
+    gunzip -c "$ultimo" | $COMPOSE exec -T "$SERVICIO_WEB" sh -lc \
+      'psql "$(printf "%s" "$DATABASE_URL" | sed "s|+psycopg||")"' >/dev/null
+  fi
 
   $COMPOSE restart "$SERVICIO_WEB" >/dev/null 2>&1 || true
   ok "Base restaurada desde $(basename "$ultimo")."

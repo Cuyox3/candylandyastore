@@ -18,12 +18,13 @@ from ..schemas import (
     CategoriaSalida,
     ProductoCrear,
     ProductoEditar,
+    ProductoImportar,
     ProductoSalida,
     Respuesta,
 )
 from ..security import admin_actual
 from ..seed import ETIQUETAS
-from ..utils import slug_libre
+from ..utils import slug_en_lote, slug_libre
 
 router = APIRouter(tags=["catálogo"])
 
@@ -214,21 +215,31 @@ def exportar_catalogo(
 
 @router.post("/catalogo/importar", response_model=Respuesta)
 def importar_catalogo(
-    datos: CatalogoImportar,
+    datos: CatalogoImportar | list[ProductoImportar],
     db: Session = Depends(obtener_db),
     _: Usuario = Depends(admin_actual),
 ):
     """
     Reemplaza el catálogo entero.
 
+    Acepta las dos formas: la lista pelada que devuelve `/catalogo/exportar`
+    —para poder restaurar un respaldo con curl— y el `{"productos": [...]}`
+    que manda el panel.
+
+    El `id` de cada producto se respeta si viene en el JSON y está libre, para
+    que exportar e importar no le cambie la identidad a los dulces; si falta o
+    choca, se genera desde el nombre.
+
     ⚠️ Borra todos los productos actuales. La confirmación se pide en el panel;
     aquí se valida ANTES de borrar nada: si el JSON trae una categoría que no
     existe, la respuesta es un 400 y la base se queda como estaba.
     """
-    if not datos.productos:
+    entradas = datos if isinstance(datos, list) else datos.productos
+
+    if not entradas:
         raise HTTPException(status_code=400, detail="El catálogo llegó vacío.")
 
-    faltan = {p.cat for p in datos.productos if not _existe_categoria(db, p.cat)}
+    faltan = {p.cat for p in entradas if not _existe_categoria(db, p.cat)}
     if faltan:
         raise HTTPException(
             status_code=400,
@@ -238,17 +249,20 @@ def importar_catalogo(
     db.query(Producto).delete()
     db.flush()  # que el DELETE corra antes que los INSERT, por el índice único
 
-    for i, entrada in enumerate(datos.productos):
+    usados: set[str] = set()
+    for i, entrada in enumerate(entradas):
+        slug = slug_en_lote(entrada.id, entrada.nombre, usados)
+        usados.add(slug)
         db.add(
             Producto(
-                slug=slug_libre(db, Producto, entrada.nombre),
+                slug=slug,
                 orden=i,
-                **entrada.model_dump(),
+                **entrada.model_dump(exclude={"id"}),
             )
         )
 
     db.commit()
-    return Respuesta(detalle=f"Catálogo reemplazado: {len(datos.productos)} producto(s).")
+    return Respuesta(detalle=f"Catálogo reemplazado: {len(entradas)} producto(s).")
 
 
 @router.post("/catalogo/restaurar", response_model=Respuesta)

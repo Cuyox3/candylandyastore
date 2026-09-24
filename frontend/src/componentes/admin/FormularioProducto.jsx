@@ -3,8 +3,11 @@ import { api } from '../../api';
 import { EMOJIS, PALETAS } from '../../config';
 import TarjetaProducto from '../TarjetaProducto';
 
+/* El emoji arranca vacío, como en el panel clásico: así se ve el 🍫 gris del
+   placeholder y no un valor puesto de oficio. La vista previa sigue enseñando
+   un 🍬 mientras no se elija ninguno. */
 const VACIO = {
-  nombre: '', cat: '', precio: '', origen: '', emoji: '🍬',
+  nombre: '', cat: '', precio: '', origen: '', emoji: '',
   desc: '', etiqueta: '', tipo: '', c1: '#F42A8F', c2: '#FFB8DC', img: ''
 };
 
@@ -163,8 +166,8 @@ export default function FormularioProducto({ categorias, etiquetas, editando, on
     ...datos,
     precio: Number(datos.precio) || 0,
     nombre: datos.nombre || 'Nombre del producto',
-    origen: datos.origen || 'País',
-    desc:   datos.desc   || 'Aquí va la descripción que leerá el cliente.',
+    origen: datos.origen || 'País de origen',
+    desc:   datos.desc   || 'Aquí va la descripción que verá tu cliente.',
     emoji:  datos.emoji  || '🍬'
   };
 
@@ -249,7 +252,7 @@ export default function FormularioProducto({ categorias, etiquetas, editando, on
             {!datos.img && (
               <p className="img-drop-txt" id="imgTexto">
                 Arrastra una foto aquí o <b>elige un archivo</b>
-                <br /><small>PNG, JPG o WebP · el servidor la reduce a 560 px</small>
+                <br /><small>PNG, JPG o WebP · se reduce a 560 px automáticamente</small>
               </p>
             )}
 

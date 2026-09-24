@@ -27,6 +27,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Cinturón por si el repositorio se clonó en Windows antes de que existiera el
+# .gitattributes: con finales CRLF el contenedor arranca y muere al instante
+# con «env: 'sh\r': No such file or directory». Quitarlos aquí no cuesta nada.
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
 # Nada corre como root. El uid 1000 es el mismo que usa deploy.sh al hacer
 # chown de la carpeta de medios en el host: si no coinciden, el contenedor no
 # puede escribir las fotos que se suben desde el panel.

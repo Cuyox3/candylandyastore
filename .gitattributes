@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Finales de línea
+#
+# Los scripts que corren DENTRO de los contenedores tienen que llegar con
+# finales LF. Si se clona el repositorio en Windows con core.autocrlf=true
+# (lo que trae Git for Windows de fábrica), entrypoint.sh queda con CRLF y el
+# contenedor muere al arrancar con un error que no menciona el salto de línea:
+#     env: 'sh\r': No such file or directory
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Normaliza a LF en el repositorio cualquier archivo de texto.
+* text=auto eol=lf
+
+# Y estos, además, en el disco: los lee Linux aunque se editen en Windows.
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+*.conf      text eol=lf
+.env.example text eol=lf
+
+# Binarios: que git no los toque.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary

@@ -39,7 +39,12 @@ export default function TarjetaProducto({ producto, onPedir, botonInerte = false
         <h3>{p.nombre}</h3>
         <p>{p.desc}</p>
         <div className="card-foot">
-          <span className="card-price">${formatearPrecio(p.precio)}</span>
+          {/* El '$' va PEGADO al número en una sola cadena a propósito: como
+              dos hijos sueltos, React crea dos nodos de texto y el navegador
+              mide cada uno por su lado. Se nota: el precio queda 1/64 de píxel
+              más ancho que en el sitio clásico y los bordes de las cifras se
+              dibujan distinto. */}
+          <span className="card-price">{'$' + formatearPrecio(p.precio)}</span>
           <button
             className="card-btn"
             type="button"

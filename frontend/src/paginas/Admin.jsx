@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, sesion, EVENTO_SIN_SESION } from '../api';
+import TopBar from '../componentes/TopBar';
 import Navbar from '../componentes/Navbar';
 import { FooterBottom } from '../componentes/Footer';
 import Modal, { ModalAncha } from '../componentes/Modal';
@@ -8,6 +9,16 @@ import Acceso from '../componentes/admin/Acceso';
 import FormularioProducto from '../componentes/admin/FormularioProducto';
 import ListaProductos from '../componentes/admin/ListaProductos';
 import { useToast } from '../hooks/useToast';
+import { useTitulo } from '../hooks/useTitulo';
+
+/* La cinta rosa de arriba, con los mismos tres avisos de admin.html. El
+   tercero cambió de texto —antes decía «en este navegador»— porque ahora el
+   catálogo vive en el servidor y lo que se guarda aquí lo ve todo el mundo. */
+const MENSAJES = [
+  '🍬 Panel de administración de Candylandia Store',
+  '✨ Agrega, modifica y quita productos · con foto o con emoji',
+  '💾 Los cambios se guardan en el servidor'
+];
 
 /* Los enlaces del panel apuntan a la tienda, igual que en admin.html. */
 const ENLACES = [
@@ -26,6 +37,8 @@ const ENLACES = [
    ya no tiene sentido.
    ========================================================= */
 export default function Admin() {
+  useTitulo('Panel de administración | Candylandia Store');
+
   /* --- sesión --- */
   const [comprobando, setComprobando] = useState(true);
   const [dentro, setDentro]           = useState(false);
@@ -121,7 +134,11 @@ export default function Admin() {
      --------------------------------------------------------- */
   async function entrar(usuario, password) {
     const r = await api.login(usuario, password);   // si falla, Acceso pinta el error
-    sesion.guardar(r.token);
+    /* El campo es `access_token`, como manda el esquema Token del API. Con
+       `r.token` se guardaba la cadena "undefined" y el panel se abría igual
+       —el catálogo se lee sin permiso— pero guardar, editar o borrar moría
+       con un 401 y la sesión no sobrevivía a recargar la página. */
+    sesion.guardar(r.access_token);
     setDentro(true);
     mostrar(`¡Hola, ${r.usuario}! 🍭`);
   }
@@ -164,8 +181,8 @@ export default function Admin() {
 
   function quitar(p) {
     setConfirmar({
-      titulo: '¿Quitar este producto?',
-      texto: `«${p.nombre}» saldrá de la tienda. Esta acción no se puede deshacer.`,
+      titulo: `¿Quitar "${p.nombre}"?`,
+      texto: 'Dejará de aparecer en la tienda. Puedes volver a agregarlo cuando quieras.',
       textoOk: 'Sí, quitar',
       alAceptar: async () => {
         await api.quitarProducto(p.id);
@@ -295,6 +312,7 @@ export default function Admin() {
 
   return (
     <>
+      <TopBar mensajes={MENSAJES} />
       <Navbar inicio="/" enlaces={ENLACES} bajado={bajado} extra={cerrarSesionBtn} />
 
       {/* Mientras se comprueba el token no se enseña ni el acceso ni el panel:
@@ -382,7 +400,7 @@ export default function Admin() {
 
       <footer className="footer">
         <FooterBottom>
-          <p>© {new Date().getFullYear()} Candylandia Store · Panel de administración</p>
+          <p>© <span id="year">{new Date().getFullYear()}</span> Candylandia Store · Panel de administración</p>
           <p><a href="/">Volver a la tienda</a></p>
         </FooterBottom>
       </footer>

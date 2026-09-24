@@ -38,5 +38,34 @@ def slug_libre(db, modelo, texto: str) -> str:
     return candidato
 
 
+def slug_en_lote(deseado: str, nombre: str, usados: set[str]) -> str:
+    """
+    El slug de un producto dentro de una importación, sin tocar la base.
+
+    Conserva el id que traía el respaldo —el panel estático volcaba el JSON
+    tal cual, y así un enlace guardado a un producto sigue valiendo después
+    de restaurar—, pasado por `slugificar` porque ese JSON lo ha podido tocar
+    cualquiera a mano. Si falta o ya está cogido, se saca del nombre.
+
+    Lo reservado se lleva en `usados` y NO se consulta a la base a propósito:
+    la sesión es `autoflush=False`, o sea que las filas que se van añadiendo
+    no existen para Postgres hasta el commit. Preguntándole a él, dos
+    productos del mismo JSON que se llamen igual (o que repitan id) se
+    llevarían los dos el mismo slug y el INSERT final moriría con
+    «duplicate key value violates unique constraint "ix_productos_slug"».
+    """
+    candidato = slugificar(deseado) if deseado else ""
+    if candidato and candidato not in usados:
+        return candidato
+
+    base = slugificar(nombre)
+    candidato = base
+    n = 2
+    while candidato in usados:
+        candidato = f"{base}-{n}"
+        n += 1
+    return candidato
+
+
 def ahora() -> datetime:
     return datetime.now(timezone.utc)

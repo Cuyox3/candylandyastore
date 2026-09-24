@@ -10,21 +10,19 @@ import { useEffect } from 'react';
    CSS y no con un setTimeout.
    ========================================================= */
 export default function Modal({ abierto, titulo, children, onCerrar, acciones }) {
-  /* Escape cierra, y mientras está abierta el fondo no hace scroll: en el
-     móvil, sin esto, al desplazar la modal se movía la página de detrás. */
+  /* Escape cierra, como en el panel clásico.
+
+     Aquí se bloqueaba además el scroll del fondo (body.overflow = hidden).
+     Se quitó: en el escritorio eso hace desaparecer la barra de scroll y la
+     página de detrás salta 15 px a la derecha al abrir la ventana, algo que
+     el sitio clásico no hace. Si algún día molesta el scroll del fondo en el
+     móvil, hay que compensar el ancho de la barra o no habrá paridad. */
   useEffect(() => {
     if (!abierto) return;
 
     const alPulsar = (e) => { if (e.key === 'Escape') onCerrar(); };
     document.addEventListener('keydown', alPulsar);
-
-    const overflowPrevio = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.removeEventListener('keydown', alPulsar);
-      document.body.style.overflow = overflowPrevio;
-    };
+    return () => document.removeEventListener('keydown', alPulsar);
   }, [abierto, onCerrar]);
 
   if (!abierto) return null;
