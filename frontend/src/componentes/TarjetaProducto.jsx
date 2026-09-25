@@ -29,7 +29,12 @@ export default function TarjetaProducto({ producto, onPedir, botonInerte = false
         {p.etiqueta ? <span className={'tag ' + (p.tipo || '')}>{p.etiqueta}</span> : null}
 
         {hayFoto
-          ? <img className="card-img" src={p.img} alt={p.nombre} loading="lazy"
+          /* El alt lleva el origen además del nombre: «Pocky Fresa» a secas
+             no dice nada en Google Imágenes, y de aquí salen las decenas de
+             fotos del catálogo. */
+          ? <img className="card-img" src={p.img}
+                 alt={p.origen ? `${p.nombre}, dulce de importación de ${p.origen}` : p.nombre}
+                 loading="lazy" decoding="async"
                  onError={() => setFotoRota(true)} />
           : <span className="emoji">{p.emoji}</span>}
       </div>

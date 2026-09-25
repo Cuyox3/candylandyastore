@@ -11,7 +11,14 @@ const BENEFICIOS = [
 
 export default function Beneficios() {
   return (
-    <section className="benefits">
+    /* El diseño de esta franja no lleva título: son cuatro tarjetas y ya. Pero
+       sin un h2 los cuatro h3 de abajo cuelgan directamente del h1 del hero, y
+       tanto un lector de pantalla como un buscador leen eso como un salto de
+       nivel. El título está, sólo que sólo lo ve quien no ve la página. */
+    <section className="benefits" aria-labelledby="beneficios-titulo">
+      <h2 id="beneficios-titulo" className="sr-only">
+        Por qué comprar en Candylandia Store
+      </h2>
       <div className="container grid-4">
         {BENEFICIOS.map((b) => (
           <article className="benefit reveal" key={b.titulo}>

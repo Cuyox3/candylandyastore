@@ -1,10 +1,18 @@
 export default function Nosotros() {
   return (
-    <section className="section" id="nosotros">
+    <section className="section" id="nosotros" aria-labelledby="nosotros-titulo">
       <div className="container about-grid">
         <div className="about-art reveal">
           <div className="about-frame">
-            <img src="/assets/mascota.png" alt="Candy, mascota de Candylandia Store" />
+            <picture>
+              <source srcSet="/assets/mascota.webp" type="image/webp" />
+              <img
+                src="/assets/mascota.png"
+                alt="Candy, la mascota de Candylandia Store, dando la bienvenida"
+                width="401" height="438"
+                loading="lazy" decoding="async"
+              />
+            </picture>
           </div>
           <div className="about-badge">
             <strong>Hola, soy Candy 👋</strong>
@@ -14,7 +22,7 @@ export default function Nosotros() {
 
         <div className="about-copy reveal">
           <span className="eyebrow">Nosotros</span>
-          <h2>Una tiendita chiquita con <span className="grad-text">sabores de todo el mundo</span></h2>
+          <h2 id="nosotros-titulo">Una tiendita chiquita con <span className="grad-text">sabores de todo el mundo</span></h2>
           <p>
             Candylandia Store nació en 2021 de un antojo muy específico: probar esos dulces que solo salían
             en videos de internet. Empezamos con una maleta de gomitas japonesas y hoy somos la tienda favorita

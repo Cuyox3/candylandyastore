@@ -1,0 +1,24 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Candylandia Store — candylandiastore.mx
+#
+# La tienda es una sola página, así que aquí hay poco que prohibir. Lo que sí
+# importa es la excepción de /api/v1/fotos/: las fotos de los productos se
+# sirven desde ahí, y un «Disallow: /api/» a secas dejaría el catálogo entero
+# sin imágenes en Google Imágenes y en las vistas previas de los resultados.
+# ─────────────────────────────────────────────────────────────────────────────
+
+User-agent: *
+
+# Las fotos de los productos. Va ANTES del Disallow porque, aunque el orden
+# no importa (gana la regla más específica), así se lee sin sustos.
+Allow: /api/v1/fotos/
+
+# El panel de administración y el resto del API no aportan nada en una
+# búsqueda: son JSON y una pantalla de acceso.
+Disallow: /admin
+Disallow: /api/
+Disallow: /healthz
+
+Allow: /
+
+Sitemap: https://candylandiastore.mx/sitemap.xml

@@ -37,12 +37,22 @@ la base y el rol, genera el `.env` con contraseñas nuevas, levanta los
 contenedores, configura el Nginx del host y emite el certificado. Al terminar
 enseña **una vez** la contraseña del panel: apúntala.
 
+Este sitio está configurado para **candylandiastore.mx** en la VPS
+**217.77.8.70**. El DNS ya apunta ahí, tanto el dominio raíz como el `www`, así
+que los dos entran en el certificado.
+
 Antes de la primera vez hay que tener dos cosas:
 
-1. El registro DNS **A** del dominio apuntando ya a la IP de la VPS — si no,
-   Certbot no puede emitir el certificado.
+1. Que el registro **A** siga apuntando a la VPS. El script lo comprueba solo y
+   **no llama a Certbot si no cuadra**: cada intento fallido gasta uno de los 5
+   que Let's Encrypt permite por dominio y hora, así que es mejor no gastarlo.
 2. PostgreSQL corriendo en el host, aceptando conexiones desde la red de
    Docker. El script avisa con las líneas exactas si no es el caso.
+
+El correo para los avisos de caducidad va en `LETSENCRYPT_EMAIL` del `.env`. Si
+está vacío, el script lo pregunta en el primer despliegue y lo guarda ahí. No
+está escrito en `deploy.sh` a propósito: ese archivo va a un repositorio
+público, y una dirección en un repo público se recolecta sola.
 
 Después, publicar cambios de código es:
 
@@ -101,10 +111,22 @@ Tres decisiones que explican casi todo lo demás:
 **El Nginx del host es dueño del 80 y el 443.** En esta VPS conviven varios
 sitios y sólo puede haber un proceso escuchando en esos puertos. Cada proyecto
 publica **un puerto alto en loopback** y el Nginx del host reparte por dominio.
-Candylandia tiene el **8520** (el mapa completo está en `deploy.sh --help`). Por
-eso el `docker-compose.yml` publica `127.0.0.1:8520:1515` y nunca `80:…`: sin
-el `127.0.0.1` delante, Docker abriría el puerto en todas las interfaces y
-cualquiera podría saltarse el HTTPS entrando por `http://IP:8520`.
+Candylandia tiene el **8520**. Por eso el `docker-compose.yml` publica
+`127.0.0.1:8520:1515` y nunca `80:…`: sin el `127.0.0.1` delante, Docker
+abriría el puerto en todas las interfaces y cualquiera podría saltarse el
+HTTPS entrando por `http://IP:8520`.
+
+El puerto se elige **una sola vez**. En el primer despliegue el script recorre
+el rango 8520–8540, enseña cuál está libre y cuál ocupa cada sitio, y escribe
+el elegido en el `.env`. A partir de ahí **no se mueve**: una actualización
+reutiliza ese mismo puerto y recarga ese mismo contenedor. Cambiarlo por
+detrás dejaría el vhost del Nginx del host apuntando a un puerto vacío y la
+tienda caída sin que ningún comando hubiera fallado. Para verlo en cualquier
+momento:
+
+```bash
+./deploy.sh --puertos
+```
 
 **PostgreSQL corre en el host, no en Docker.** Una sola instancia para todos los
 sitios, con una base y un rol por proyecto: nadie ve los datos de los demás, los
@@ -187,3 +209,87 @@ alguien hace seis meses no vuelve.
 
 Y guárdalos fuera de la VPS. Un respaldo en el mismo disco no protege del fallo
 que más probablemente vas a sufrir.
+
+---
+
+## Posicionamiento en buscadores
+
+El sitio es **una sola página** servida por React. Eso tiene una consecuencia
+que manda sobre todo lo demás: un robot que no ejecuta JavaScript —el de
+WhatsApp, el de Facebook, la mayoría de los rastreadores de asistentes de IA—
+no ve nada de lo que pinta el React. Sólo ve `frontend/index.html`.
+
+Por eso el título, la descripción, la imagen para redes y los datos
+estructurados del negocio están **escritos a mano en ese archivo** y no los
+pone el React al arrancar. Lo que sí pone el React es lo que depende de los
+datos: el catálogo y las preguntas frecuentes.
+
+| Dónde | Qué hay | Quién lo ve |
+|--------------------------------|-------------------------------------------------------|-------------------------|
+| `frontend/index.html` | título, descripción, canónica, Open Graph, `Store` + `WebSite` + `WebPage` | todos |
+| `src/hooks/useSeo.js` | cambia la cabecera al entrar a `/admin` y la devuelve al salir | quien ejecute el React |
+| `src/paginas/Tienda.jsx` | `ItemList` con los productos y sus precios | Google (segunda pasada) |
+| `src/secciones/Faq.jsx` | `FAQPage` con las seis preguntas | Google (segunda pasada) |
+| `public/robots.txt` | permisos de rastreo y dirección del mapa | todos |
+| `public/sitemap.xml` | la única dirección del sitio | todos |
+| `frontend/nginx.conf` | `X-Robots-Tag: noindex` en `/admin` | todos |
+| vhost del host (`deploy.sh`) | redirección de `www` al dominio raíz | todos |
+
+### Lo que hay que saber antes de tocarlo
+
+**El dominio está escrito completo en dos sitios**: en `index.html` y en la
+constante `RAIZ` de `src/hooks/useSeo.js`. No se deduce de `window.location` a
+propósito: si se dedujera, quien entrara por `www.candylandiastore.mx`
+recibiría una canónica que apunta a `www`, y Google vería dos sitios iguales en
+vez de uno. Si cambias `DOMAIN` en el `.env`, cambia también esos dos.
+
+**El teléfono, la dirección y el correo del JSON-LD de `index.html` tienen que
+ser los mismos que se ven en la sección de contacto.** Un buscador que
+encuentra dos versiones del mismo dato no muestra ninguna. Ahora mismo son los
+datos de ejemplo del diseño (`Av. Dulce 123`, `+52 55 1234 5678`,
+`hola@candylandiastore.com`) — **cámbialos por los reales antes de dar de alta
+la ficha de Google Business**, y cámbialos en los dos sitios a la vez.
+
+**`/admin` va con `noindex` por partida doble**: la etiqueta `<meta>` que pone
+`useSeo` y la cabecera `X-Robots-Tag` del nginx del contenedor. No es
+redundancia inútil: `/admin` y `/` devuelven el MISMO `index.html` (así
+funciona react-router), y la etiqueta sólo la ve quien ejecute el React.
+
+**Las imágenes de marca van en WebP con el PNG de respaldo** (`<picture>`). El
+logo pasó de 240 KB a 29 y la mascota de 251 a 39. Si sustituyes alguna, genera
+las dos versiones o el navegador se quedará con la pesada.
+
+### Comprobarlo después de desplegar
+
+`./deploy.sh` ya lo hace al final: además del `/healthz` de siempre verifica que
+`robots.txt` y `sitemap.xml` se sirven de verdad —y no el `index.html` del SPA,
+que es lo que pasa cuando un archivo se pierde en el build— y que `/admin`
+manda la cabecera `noindex`.
+
+A mano, contra el sitio ya en producción:
+
+```bash
+curl -s https://candylandiastore.mx/robots.txt
+curl -sI https://candylandiastore.mx/admin | grep -i x-robots-tag
+curl -sI https://www.candylandiastore.mx/ | grep -i location   # debe ir al dominio raíz
+```
+
+Los datos estructurados sólo se pueden validar con algo que ejecute
+JavaScript, porque el catálogo y las preguntas los añade el React:
+<https://search.google.com/test/rich-results>.
+
+### Lo que falta
+
+- **Dar de alta el sitio en Google Search Console y en Bing Webmaster Tools**,
+  y mandarles el `sitemap.xml`. Sin esto no hay forma de saber qué está
+  indexado ni qué errores ve Google.
+- **Enlaces reales a las redes sociales.** Los de la sección de contacto
+  apuntan a `#`. Un perfil enlazado (y con el enlace de vuelta) es una de las
+  señales más baratas de que el negocio existe.
+- **Una página por producto.** Hoy el catálogo entero vive en `#productos`, así
+  que el sitio compite por «dulces de importación» y por nada más. Una
+  dirección por producto (`/producto/kit-kat-matcha`) es lo que permitiría
+  aparecer en las búsquedas de cada dulce por su nombre, que son muchas más y
+  mucho menos disputadas. Es un cambio de fondo: hace falta enrutado, el
+  `sitemap.xml` generado desde la base y, para que valga la pena, que el HTML
+  llegue ya pintado desde el servidor.

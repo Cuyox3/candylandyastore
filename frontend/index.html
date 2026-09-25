@@ -3,21 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Candylandia Store | Dulces de Importación</title>
-<meta name="description" content="Candylandia Store: dulces y snacks de importación de Japón, Corea, USA, Europa y más. Novedades cada semana, envíos a todo México y precios de mayoreo.">
+
+<!-- ─────────────────────────────────────────────────────────────────────────
+     Candylandia Store — cabecera de la tienda.
+
+     Lo que hay aquí NO es decoración: es lo único que un buscador ve sin
+     ejecutar JavaScript. Google sí ejecuta el React, pero lo hace en una
+     segunda pasada que puede tardar días, y el resto de robots (los de
+     Facebook, WhatsApp, X, Bing en parte, y los de los asistentes de IA) no
+     lo ejecutan nunca. Por eso el título, la descripción, las tarjetas para
+     redes y los datos estructurados del negocio están escritos aquí en
+     crudo, y no los pone el React al montarse.
+
+     El dominio está escrito completo a propósito: una URL canónica relativa
+     no sirve de nada y una sacada de window.location haría que
+     www.candylandiastore.mx se declarara canónica de sí misma, que es justo
+     lo que hay que evitar.
+     ───────────────────────────────────────────────────────────────────── -->
+
+<title>Dulces de importación en México | Candylandia Store</title>
+<meta name="description" content="Dulces y snacks de importación de Japón, Corea, USA, Europa y Brasil. Más de 450 productos originales, novedades cada semana, envíos a todo México y precios de mayoreo.">
+<link rel="canonical" href="https://candylandiastore.mx/">
+
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="theme-color" content="#F42A8F">
-<meta property="og:title" content="Candylandia Store | Dulces de Importación">
-<meta property="og:description" content="Dulces y snacks del mundo en un solo lugar. Novedades cada semana y envíos a todo México.">
-<meta property="og:image" content="/assets/logo.png">
+<meta name="author" content="Candylandia Store">
+
+<!-- Señales de dónde está el negocio. No sustituyen a una ficha de Google
+     Business, pero ayudan a que el sitio salga en búsquedas locales. -->
+<meta name="geo.region" content="MX-CMX">
+<meta name="geo.placename" content="Ciudad de México">
+
+<!-- ── Redes sociales y WhatsApp ───────────────────────────────────────── -->
 <meta property="og:type" content="website">
-<link rel="icon" href="/assets/logo.png">
-<link rel="apple-touch-icon" href="/assets/logo.png">
+<meta property="og:site_name" content="Candylandia Store">
+<meta property="og:locale" content="es_MX">
+<meta property="og:url" content="https://candylandiastore.mx/">
+<meta property="og:title" content="Dulces de importación en México | Candylandia Store">
+<meta property="og:description" content="Snacks, gomitas, chocolates y bebidas de Japón, Corea, USA, Europa y Brasil. Novedades cada semana y envíos a todo México.">
+<!-- 1200x630 y absoluta: WhatsApp y Facebook descartan las imágenes
+     pequeñas y no saben resolver una ruta relativa. -->
+<meta property="og:image" content="https://candylandiastore.mx/assets/og-candylandia.jpg">
+<meta property="og:image:secure_url" content="https://candylandiastore.mx/assets/og-candylandia.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Candy, la mascota de Candylandia Store, con una caja de dulces importados">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dulces de importación en México | Candylandia Store">
+<meta name="twitter:description" content="Snacks, gomitas, chocolates y bebidas de Japón, Corea, USA, Europa y Brasil. Envíos a todo México.">
+<meta name="twitter:image" content="https://candylandiastore.mx/assets/og-candylandia.jpg">
+<meta name="twitter:image:alt" content="Candy, la mascota de Candylandia Store, con una caja de dulces importados">
+
+<!-- ── Iconos ──────────────────────────────────────────────────────────── -->
+<!-- El logo pesa 240 KB; usarlo de favicon obligaba a descargarlo entero
+     para pintar 16 píxeles. Estos son recortes del mismo logo. -->
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/assets/icono-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+
+<!-- ── Tipografías ─────────────────────────────────────────────────────── -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<!-- La hoja de Google Fonts bloquea el pintado hasta que llega. Con
+     media="print" el navegador la descarga sin bloquear nada y el onload la
+     activa; como la familia ya venía con display=swap, el texto se ve desde
+     el primer momento con la fuente de respaldo. -->
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap"></noscript>
+
+<!-- La mascota es la imagen grande de la primera pantalla: la que Google mide
+     como LCP. Pedirla antes de que el React exista adelanta esa medida. -->
+<link rel="preload" as="image" href="/assets/mascota.webp" type="image/webp" fetchpriority="high">
+
+<!-- ── Datos estructurados del negocio ─────────────────────────────────────
+     OJO: el teléfono, la dirección y el correo de aquí abajo tienen que ser
+     los MISMOS que se ven en la sección de contacto. Si se cambian ahí, hay
+     que cambiarlos aquí (y al revés): un buscador que encuentra dos versiones
+     distintas del mismo dato se queda sin saber cuál creer y no muestra
+     ninguna. Ahora mismo son los datos de ejemplo del diseño.
+     ───────────────────────────────────────────────────────────────────── -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": ["Store", "OnlineStore"],
+      "@id": "https://candylandiastore.mx/#tienda",
+      "name": "Candylandia Store",
+      "alternateName": "Candylandia",
+      "url": "https://candylandiastore.mx/",
+      "logo": "https://candylandiastore.mx/assets/logo.png",
+      "image": "https://candylandiastore.mx/assets/og-candylandia.jpg",
+      "description": "Dulces y snacks de importación de Japón, Corea, Estados Unidos, Europa y Brasil. Venta al público y mayoreo con envíos a todo México.",
+      "slogan": "El mundo entero cabe en un dulce",
+      "foundingDate": "2021",
+      "priceRange": "$$",
+      "telephone": "+52-55-1234-5678",
+      "email": "hola@candylandiastore.com",
+      "currenciesAccepted": "MXN",
+      "paymentAccepted": "Efectivo, Tarjeta de crédito, Tarjeta de débito, Transferencia bancaria",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "Av. Dulce 123, Col. Centro",
+        "addressLocality": "Ciudad de México",
+        "addressRegion": "CDMX",
+        "addressCountry": "MX"
+      },
+      "areaServed": {
+        "@type": "Country",
+        "name": "México"
+      },
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+          "opens": "10:00",
+          "closes": "20:00"
+        },
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": "Sunday",
+          "opens": "11:00",
+          "closes": "17:00"
+        }
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "@id": "https://candylandiastore.mx/#catalogo",
+        "name": "Catálogo de dulces de importación"
+      }
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://candylandiastore.mx/#sitio",
+      "url": "https://candylandiastore.mx/",
+      "name": "Candylandia Store",
+      "inLanguage": "es-MX",
+      "publisher": { "@id": "https://candylandiastore.mx/#tienda" }
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://candylandiastore.mx/#pagina",
+      "url": "https://candylandiastore.mx/",
+      "name": "Dulces de importación en México | Candylandia Store",
+      "description": "Dulces y snacks de importación de Japón, Corea, USA, Europa y Brasil. Más de 450 productos originales, novedades cada semana, envíos a todo México y precios de mayoreo.",
+      "inLanguage": "es-MX",
+      "isPartOf": { "@id": "https://candylandiastore.mx/#sitio" },
+      "about": { "@id": "https://candylandiastore.mx/#tienda" },
+      "primaryImageOfPage": "https://candylandiastore.mx/assets/og-candylandia.jpg"
+    }
+  ]
+}
+</script>
 </head>
 <body>
 <div id="root"></div>
+
+<!-- Lo mínimo para quien llegue sin JavaScript: un robot que no ejecuta
+     scripts, un navegador con el script bloqueado, o una red que cortó el
+     bundle a medias. No sustituye a la tienda, pero deja claro qué es este
+     sitio y cómo contactarlo en lugar de servir una página en blanco. -->
+<noscript>
+  <div style="max-width:820px;margin:0 auto;padding:40px 20px;font-family:system-ui,sans-serif;color:#3F0B4C">
+    <h1>Candylandia Store — dulces de importación en México</h1>
+    <p>
+      Snacks, gomitas, chocolates y bebidas de <strong>Japón, Corea, Estados Unidos,
+      Europa y Brasil</strong>. Más de 450 productos originales, novedades cada semana
+      y envíos a toda la República. También surtimos a tiendas y cafeterías con
+      precios de mayoreo desde $3,500.
+    </p>
+    <p>
+      Esta tienda necesita JavaScript para mostrar el catálogo. Si no puedes
+      activarlo, escríbenos por
+      <a href="https://wa.me/5215512345678">WhatsApp</a> o al correo
+      <a href="mailto:hola@candylandiastore.com">hola@candylandiastore.com</a>
+      y te atendemos igual.
+    </p>
+  </div>
+</noscript>
+
 <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

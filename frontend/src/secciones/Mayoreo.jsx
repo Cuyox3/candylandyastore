@@ -1,10 +1,10 @@
 export default function Mayoreo() {
   return (
-    <section className="wholesale" id="mayoreo">
+    <section className="wholesale" id="mayoreo" aria-labelledby="mayoreo-titulo">
       <div className="container wholesale-inner">
         <div className="wholesale-copy reveal">
           <span className="eyebrow light">Mayoreo</span>
-          <h2>¿Tienes una tienda, cafetería o kiosco?</h2>
+          <h2 id="mayoreo-titulo">Dulces de importación al mayoreo para tu tienda, cafetería o kiosco</h2>
           <p>
             Surtimos a más de 120 negocios en el país con dulces de importación que se venden solos.
             Pide tu lista de precios y arma tu primer pedido desde $3,500.
@@ -18,7 +18,16 @@ export default function Mayoreo() {
           <a href="#contacto" className="btn btn-yellow btn-lg">Solicitar lista de precios 📋</a>
         </div>
         <div className="wholesale-art reveal">
-          <img src="/assets/mascota.png" alt="Mascota Candy con caja de dulces de mayoreo" className="floaty" />
+          <picture>
+            <source srcSet="/assets/mascota.webp" type="image/webp" />
+            <img
+              src="/assets/mascota.png"
+              alt="Candy con una caja de dulces de importación para pedidos de mayoreo"
+              className="floaty"
+              width="401" height="438"
+              loading="lazy" decoding="async"
+            />
+          </picture>
         </div>
       </div>
     </section>

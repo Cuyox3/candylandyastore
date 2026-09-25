@@ -9,7 +9,7 @@ import Acceso from '../componentes/admin/Acceso';
 import FormularioProducto from '../componentes/admin/FormularioProducto';
 import ListaProductos from '../componentes/admin/ListaProductos';
 import { useToast } from '../hooks/useToast';
-import { useTitulo } from '../hooks/useTitulo';
+import { SITIO, useSeo } from '../hooks/useSeo';
 
 /* La cinta rosa de arriba, con los mismos tres avisos de admin.html. El
    tercero cambió de texto —antes decía «en este navegador»— porque ahora el
@@ -37,7 +37,21 @@ const ENLACES = [
    ya no tiene sentido.
    ========================================================= */
 export default function Admin() {
-  useTitulo('Panel de administración | Candylandia Store');
+  /* El `noindex` no es un detalle: /admin y / devuelven el MISMO index.html
+     —así funciona react-router—, así que para un buscador son dos direcciones
+     con idéntico contenido. Sin esto, Google indexa la pantalla de acceso
+     como si fuera una página más de la tienda y luego decide por su cuenta
+     cuál de las dos enseñar.
+
+     El nginx manda además la cabecera X-Robots-Tag en /admin, que es la que
+     leen los robots que no ejecutan JavaScript y por tanto nunca llegan a ver
+     esta etiqueta. Las dos dicen lo mismo a propósito. */
+  useSeo({
+    titulo: 'Panel de administración | Candylandia Store',
+    descripcion: 'Acceso privado para administrar el catálogo de Candylandia Store.',
+    canonica: `${SITIO.url}/admin`,
+    robots: 'noindex, nofollow, noarchive'
+  });
 
   /* --- sesión --- */
   const [comprobando, setComprobando] = useState(true);

@@ -9,11 +9,11 @@ const TESTIMONIOS = [
 
 export default function Testimonios() {
   return (
-    <section className="section section-alt" id="testimonios">
+    <section className="section section-alt" id="testimonios" aria-labelledby="testimonios-titulo">
       <div className="container">
         <div className="section-head reveal">
           <span className="eyebrow">Testimonios</span>
-          <h2>Lo que dicen <span className="grad-text">nuestros golosos</span></h2>
+          <h2 id="testimonios-titulo">Lo que dicen <span className="grad-text">nuestros golosos</span></h2>
         </div>
         <div className="grid-3">
           {TESTIMONIOS.map((t) => (

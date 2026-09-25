@@ -56,6 +56,19 @@ DOMINIO_DEFECTO="candylandiastore.mx"
 # Puerto loopback asignado a este proyecto en la VPS. El mapa completo está en
 # `mapa_de_puertos` (más abajo) y en ARQUITECTURA.md. NO reutilices otro.
 APP_PORT_DEFECTO=8520
+# Hasta dónde buscar si el 8520 estuviera ocupado. Sólo se usa en el PRIMER
+# despliegue: una vez elegido, el puerto queda escrito en el .env y ya no se
+# mueve nunca más (ver `resolver_puerto`).
+PUERTO_BUSQUEDA_MAX=8540
+
+# IP pública de la VPS. Sirve para dos cosas distintas:
+#   * comprobar que el DNS del dominio apunta AQUÍ antes de llamar a Certbot,
+#     porque cada intento fallido gasta uno de los 5 que Let's Encrypt permite
+#     por dominio y hora;
+#   * avisar si el script se está corriendo en una máquina que no es la que se
+#     esperaba, que es la forma fácil de desplegar sin querer en el servidor
+#     equivocado.
+IP_SERVIDOR_ESPERADA="217.77.8.70"
 
 # ── Base de datos ──────────────────────────────────────────────────────────
 # Base y rol propios en el PostgreSQL del host. Cada proyecto tiene los suyos y
@@ -321,7 +334,7 @@ mapa_de_puertos() {
     8517  marketing      makerthing.cuyox3.com
     8518  panel_bot      bots.cuyox3.com
     8519  seguros        ase-guradora.cuyox3.com
-    8520  candylandia    candylandia.cuyox3.com
+    8520  candylandia    candylandiastore.mx
     8521+ libres para proyectos nuevos
 MAPA
 }
@@ -427,6 +440,7 @@ Opciones:
 
 Operación (no necesitan el despliegue completo):
   --estado            Qué corre, en qué puerto, base, catálogo y certificado.
+  --puertos           Qué puerto está libre y cuál ocupa cada sitio de la VPS.
   --ver-logs          Sigue los logs y sale con Ctrl-C.
   --reiniciar         Reinicia los contenedores sin reconstruir.
   --abajo             Detiene la aplicación (los demás sitios siguen).
@@ -473,6 +487,7 @@ parsear_opciones() {
       sin-ssl)              SIN_SSL=1 ;;
       full|completo)        MODO="completo" ;;
       estado|status)        ACCION="estado" ;;
+      puertos|ports)        ACCION="puertos" ;;
       ver-logs)             ACCION="ver-logs" ;;
       reiniciar|restart)    ACCION="reiniciar" ;;
       abajo|down)           ACCION="abajo" ;;
@@ -581,6 +596,125 @@ contenedor_propio_en_puerto() {
 $(contenedores_en_puerto "$1")
 EOF
   return 0
+}
+
+# ── Elección del puerto ─────────────────────────────────────────────────────
+# Regla de oro: un puerto ya asignado NO SE MUEVE. Sólo se busca uno libre en
+# el primer despliegue. Moverlo en una actualización dejaría el vhost del host
+# apuntando a un puerto donde ya no hay nada y el sitio caído, sin que ningún
+# comando fallara: el despliegue diría «correcto» y los clientes verían un 502.
+
+#: ¿Está este puerto disponible PARA NOSOTROS?
+#  Un puerto que ocupa nuestro propio contenedor cuenta como disponible: es el
+#  caso normal de una actualización, y Compose lo reemplaza sin más.
+puerto_disponible() {
+  local p="$1" ocupa ajeno
+  ocupa="$(proceso_en_puerto "$p")" || true
+  [ -z "$ocupa" ] && return 0
+  ajeno="$(contenedor_en_puerto "$p")" || true
+  [ "$ocupa" = "docker-proxy" ] && [ -z "$ajeno" ] && return 0
+  return 1
+}
+
+#: Quién ocupa el puerto, en una línea legible (vacío si está libre).
+quien_ocupa() {
+  local p="$1" proc cont
+  proc="$(proceso_en_puerto "$p")" || true
+  [ -z "$proc" ] && return 0
+  cont="$(contenedor_en_puerto "$p")" || true
+  [ -z "$cont" ] && cont="$(contenedor_propio_en_puerto "$p")" || true
+  [ -n "$cont" ] && echo "${proc} → contenedor ${cont}" || echo "$proc"
+}
+
+#: Tabla de ocupación del rango de la VPS. Es lo que contesta a «comprueba que
+#  los puertos estén vacíos»: se ve de un vistazo cuál está tomado y por quién.
+informe_puertos() {
+  local p quien
+  log "Puertos del rango de la VPS (${APP_PORT_DEFECTO}–${PUERTO_BUSQUEDA_MAX}):"
+  for p in $(seq "$APP_PORT_DEFECTO" "$PUERTO_BUSQUEDA_MAX"); do
+    quien="$(quien_ocupa "$p")" || true
+    if [ -z "$quien" ]; then
+      [ "$p" = "${APP_PORT:-}" ] && log "    ${p}  libre  ← el nuestro" || log "    ${p}  libre"
+    elif [ "$p" = "${APP_PORT:-}" ] && ! puerto_disponible "$p"; then
+      warn "    ${p}  OCUPADO por ${quien}  ← el nuestro, y no es nuestro proceso"
+    elif [ "$p" = "${APP_PORT:-}" ]; then
+      ok "    ${p}  lo ocupa este mismo stack (${quien})  ← el nuestro"
+    else
+      log "    ${p}  ocupado por ${quien}"
+    fi
+  done
+}
+
+#: El primer puerto libre desde `$1`. Devuelve 1 si no queda ninguno.
+buscar_puerto_libre() {
+  local p="$1"
+  while [ "$p" -le "$PUERTO_BUSQUEDA_MAX" ]; do
+    puerto_disponible "$p" && { echo "$p"; return 0; }
+    p=$((p + 1))
+  done
+  return 1
+}
+
+# Decide con qué puerto se trabaja, por orden de prioridad:
+#   1. El que se pida a mano en la línea de órdenes (APP_PORT=8523 ./deploy.sh).
+#   2. El que ya esté escrito en el .env  → ACTUALIZACIÓN: se respeta siempre.
+#   3. Ninguno de los dos → PRIMER DESPLIEGUE: se busca el primero libre.
+resolver_puerto() {
+  local previo=""
+  [ -f "$ENV_FILE" ] && previo="$(sed -n 's/^APP_PORT=\([0-9][0-9]*\).*/\1/p' "$ENV_FILE" | head -1)"
+  PUERTO_HEREDADO=0
+
+  if [ -n "${APP_PORT_SOLICITADO:-}" ]; then
+    APP_PORT="$APP_PORT_SOLICITADO"
+    log "Puerto ${APP_PORT}: pedido a mano en la línea de órdenes."
+
+  elif [ -n "$previo" ]; then
+    APP_PORT="$previo"
+    PUERTO_HEREDADO=1
+    log "Puerto ${APP_PORT}: ya asignado a este sitio en el .env; se mantiene."
+
+  else
+    log "Primer despliegue: buscando un puerto libre desde el ${APP_PORT_DEFECTO}…"
+    informe_puertos
+    local elegido
+    elegido="$(buscar_puerto_libre "$APP_PORT_DEFECTO")" || {
+      err "No queda ningún puerto libre entre ${APP_PORT_DEFECTO} y ${PUERTO_BUSQUEDA_MAX}."
+      err "Sube PUERTO_BUSQUEDA_MAX en deploy.sh o libera alguno."
+      exit 1
+    }
+    APP_PORT="$elegido"
+    if [ "$APP_PORT" = "$APP_PORT_DEFECTO" ]; then
+      ok "Puerto ${APP_PORT}: libre, es el que tiene asignado este proyecto."
+    else
+      warn "El ${APP_PORT_DEFECTO} estaba ocupado; se usará el ${APP_PORT}."
+      warn "  Apúntalo en el mapa de puertos (deploy.sh y ARQUITECTURA.md)."
+    fi
+  fi
+
+  # Comprobación final, valga el camino que valga.
+  local quien
+  quien="$(quien_ocupa "$APP_PORT")" || true
+  if puerto_disponible "$APP_PORT"; then
+    if [ -n "$quien" ]; then
+      # Es nuestro propio contenedor: justo lo que se espera en un update.
+      ok "Puerto ${APP_PORT}: lo tiene este mismo stack (${quien})."
+      ok "  Compose recargará ESE contenedor; el puerto no cambia."
+    else
+      ok "Puerto ${APP_PORT}: libre y comprobado."
+    fi
+  else
+    err "El puerto ${APP_PORT} lo ocupa algo que no es de este proyecto: ${quien}"
+    if [ "$PUERTO_HEREDADO" -eq 1 ]; then
+      err "Es el puerto que este sitio tiene asignado en el .env, así que NO lo"
+      err "cambio por mi cuenta: el vhost del Nginx del host apunta ahí y moverlo"
+      err "a ciegas dejaría la tienda caída."
+      err "Libera ese puerto, o elige otro a conciencia y actualiza las dos cosas:"
+      err "    APP_PORT=<nuevo> sudo ./deploy.sh"
+    fi
+    err "Mapa de puertos de la VPS:"
+    mapa_de_puertos >&2
+    exit 1
+  fi
 }
 
 # ---------------------------------------------------------------------------
@@ -972,6 +1106,75 @@ verificar_medios() {
 }
 
 # ---------------------------------------------------------------------------
+# 5 bis. DNS
+# ---------------------------------------------------------------------------
+# Certbot demuestra que el dominio es tuyo pidiéndole a Let's Encrypt que
+# visite http://EL-DOMINIO/.well-known/... Si el DNS no apunta a esta máquina,
+# esa visita llega a otro sitio y la emisión falla — gastando uno de los 5
+# intentos por dominio y hora que permite Let's Encrypt. Por eso se comprueba
+# ANTES y no se llama a Certbot en balde.
+
+#: IP pública real de esta máquina.
+ip_de_esta_maquina() {
+  local ip
+  ip="${IP_SERVIDOR:-}"
+  [ -n "$ip" ] || ip="$(curl -fsS --max-time 6 https://api.ipify.org 2>/dev/null || true)"
+  [ -n "$ip" ] || ip="$(curl -fsS --max-time 6 https://ifconfig.me 2>/dev/null || true)"
+  echo "$ip"
+}
+
+#: A dónde resuelve un nombre (primera IPv4).
+resuelve_a() {
+  local nombre="$1" ip=""
+  if command -v getent >/dev/null 2>&1; then
+    ip="$(getent ahostsv4 "$nombre" 2>/dev/null | awk '{print $1}' | head -n1 || true)"
+  fi
+  [ -n "$ip" ] || ip="$(dig +short +time=3 +tries=1 "$nombre" A 2>/dev/null | grep -E '^[0-9.]+$' | head -n1 || true)"
+  echo "$ip"
+}
+
+#: ¿Apunta este nombre a esta máquina? 0 = sí.
+apunta_aqui() {
+  local nombre="$1" destino
+  destino="$(resuelve_a "$nombre")"
+  [ -n "$destino" ] || return 1
+  [ "$destino" = "$IP_AQUI" ] && return 0
+  return 1
+}
+
+# Comprueba el dominio y sus alias. Es informativo: no corta el despliegue,
+# porque la tienda funciona igual por HTTP mientras el DNS se propaga.
+verificar_dns() {
+  IP_AQUI="$(ip_de_esta_maquina)"
+  if [ -z "$IP_AQUI" ]; then
+    warn "No pude averiguar la IP pública de esta máquina (¿sin salida a internet?)."
+    IP_AQUI="${IP_SERVIDOR_ESPERADA:-}"
+    [ -n "$IP_AQUI" ] && warn "  Se asume la esperada: ${IP_AQUI}"
+    return 0
+  fi
+
+  if [ -n "${IP_SERVIDOR_ESPERADA:-}" ] && [ "$IP_AQUI" != "$IP_SERVIDOR_ESPERADA" ]; then
+    warn "Esta máquina tiene la IP ${IP_AQUI}, pero se esperaba ${IP_SERVIDOR_ESPERADA}."
+    warn "  ¿Seguro que estás desplegando en la VPS correcta?"
+  else
+    ok "IP de esta máquina: ${IP_AQUI}"
+  fi
+
+  local nombre destino
+  for nombre in "$DOMAIN" ${DOMAIN_ALIASES//,/ }; do
+    [ -n "$nombre" ] || continue
+    destino="$(resuelve_a "$nombre")"
+    if [ -z "$destino" ]; then
+      warn "DNS: ${nombre} no resuelve todavía (falta el registro, o aún se propaga)."
+    elif [ "$destino" = "$IP_AQUI" ]; then
+      ok "DNS: ${nombre} → ${destino} (aquí)"
+    else
+      warn "DNS: ${nombre} → ${destino}, que NO es esta máquina (${IP_AQUI})."
+    fi
+  done
+}
+
+# ---------------------------------------------------------------------------
 # 6. Certbot
 # ---------------------------------------------------------------------------
 # El plugin va en un paquete APARTE del binario. Comprobar sólo `command -v
@@ -1011,19 +1214,74 @@ asegurar_certbot_nginx() {
   return 1
 }
 
+# Let's Encrypt avisa a esta dirección cuando el certificado está a punto de
+# caducar. Suele ser el único recordatorio que vas a tener.
+#
+# La dirección NO se escribe en este archivo a propósito: deploy.sh va a git y
+# el repositorio es público, y una dirección en un repo público se recolecta
+# sola. Vive en el .env, que está en .gitignore.
+asegurar_email_certbot() {
+  CERTBOT_EMAIL="${LETSENCRYPT_EMAIL:-${CERTBOT_EMAIL:-}}"
+  [ -n "$CERTBOT_EMAIL" ] && return 0
+
+  # Si hay alguien delante, se pregunta y se guarda; si no (cron), no se
+  # inventa ninguna: una dirección falsa hace que el aviso de caducidad se
+  # pierda y el certificado expire sin que nadie se entere.
+  if [ -t 0 ]; then
+    echo
+    warn "Falta LETSENCRYPT_EMAIL: es donde Let's Encrypt avisa de la caducidad."
+    printf 'Correo para los avisos del certificado (Enter para omitir): '
+    read -r CERTBOT_EMAIL
+    CERTBOT_EMAIL="$(printf '%s' "$CERTBOT_EMAIL" | tr -d '[:space:]')"
+    if [ -n "$CERTBOT_EMAIL" ]; then
+      fijar_env LETSENCRYPT_EMAIL "$CERTBOT_EMAIL"
+      ok "Guardado en el .env (que no va a git)."
+      return 0
+    fi
+  fi
+
+  warn "Sin correo no pido el certificado: los avisos de caducidad se perderían"
+  warn "  y el certificado expiraría en silencio dentro de 90 días."
+  warn "  Ponlo en el .env y reintenta:"
+  warn "    echo 'LETSENCRYPT_EMAIL=tu@correo.com' >> ${ENV_FILE}"
+  warn "    sudo ./deploy.sh --ssl"
+  return 1
+}
+
 emitir_certificado() {
   local staging="" extra="" alias
+  asegurar_email_certbot || return 0
   if [ "${CERTBOT_STAGING:-0}" = "1" ]; then
     staging="--staging"
     warn "Modo STAGING: el certificado NO será de confianza (sólo pruebas)."
   fi
-  # Alias opcionales (www…). Cada uno necesita su propio registro DNS: si falta,
-  # Certbot falla y el dominio principal se queda sin certificado también.
+  # El dominio principal tiene que apuntar aquí. Si no, Certbot va a fallar
+  # seguro, y cada fallo gasta uno de los 5 intentos por dominio y hora.
+  [ -n "${IP_AQUI:-}" ] || IP_AQUI="$(ip_de_esta_maquina)"
+  if ! apunta_aqui "$DOMAIN"; then
+    local destino; destino="$(resuelve_a "$DOMAIN")"
+    warn "No pido el certificado: ${DOMAIN} ${destino:+resuelve a ${destino} y }no apunta a esta máquina (${IP_AQUI:-?})."
+    warn "  Let's Encrypt tiene que poder visitar http://${DOMAIN}/.well-known/…"
+    warn "  y ahora mismo esa visita llegaría a otro servidor."
+    warn "  Corrige el registro A y reintenta:  sudo ./deploy.sh --ssl"
+    warn "  La tienda queda servida por HTTP mientras tanto."
+    return 0
+  fi
+
+  # Los alias (www…) se incluyen UNO A UNO y sólo si apuntan aquí. Certbot es
+  # todo-o-nada: un solo nombre que no valide tumba la emisión entera y el
+  # dominio principal se quedaría sin certificado por culpa del www.
   if [ -n "${DOMAIN_ALIASES:-}" ]; then
     for alias in ${DOMAIN_ALIASES//,/ }; do
-      [ -n "$alias" ] && extra="$extra -d $alias"
+      [ -n "$alias" ] || continue
+      if apunta_aqui "$alias"; then
+        extra="$extra -d $alias"
+      else
+        warn "Alias ${alias}: se queda FUERA del certificado (no apunta aquí)."
+        warn "  Incluirlo haría fallar la emisión también para ${DOMAIN}."
+      fi
     done
-    log "Alias incluidos en el certificado:${extra}"
+    [ -n "$extra" ] && log "Alias incluidos en el certificado:${extra}"
   fi
 
   log "Emitiendo/renovando el certificado de ${DOMAIN}…"
@@ -1081,8 +1339,32 @@ diagnosticar_nginx() {
 # nosotros un bloque 443 con rutas a certificados que aún no existen impediría
 # que nginx arrancara la primera vez.
 escribir_vhost() {
-  local RAIZ_MEDIOS
+  local RAIZ_MEDIOS BLOQUE_CANONICO
   RAIZ_MEDIOS="$(dirname "$DIR_MEDIOS")"
+
+  # El sitio responde por varios nombres (el dominio, el www y, si alguien lo
+  # escribe, la IP pelada). Para un buscador eso son tres sitios distintos con
+  # el mismo contenido, y reparte entre ellos la autoridad que debería ir a
+  # uno solo. La página trae su <link rel="canonical">, pero una redirección
+  # es una señal más fuerte y además evita que alguien comparta un enlace con
+  # www que luego no coincide con el que está indexado.
+  #
+  # Va con \$scheme y no con https fijo a propósito: en el primer despliegue
+  # todavía no hay certificado, y mandar a https:// antes de que exista
+  # dejaría el sitio inaccesible hasta que Certbot terminara. Certbot añade
+  # después su propia redirección a https, así que el salto se da igual.
+  BLOQUE_CANONICO=""
+  if [ "$DOMAIN" != "localhost" ] && [ -n "${DOMAIN_ALIASES:-}" ]; then
+    BLOQUE_CANONICO=$(cat <<CANON
+
+        # Un solo nombre para el sitio: ${DOMAIN}.
+        if (\$host != "${DOMAIN}") {
+            return 301 \$scheme://${DOMAIN}\$request_uri;
+        }
+CANON
+)
+  fi
+
   cat <<VHOST
 # ─────────────────────────────────────────────────────────────────────────────
 # ${DOMAIN} — generado por deploy.sh de ${NOMBRE}. NO editar a mano: el
@@ -1123,10 +1405,10 @@ server {
         root /var/www/html;
     }
 
-    # `root` y no `alias` a propósito. Con `alias`, nginx concatena la ruta con
+    # \`root\` y no \`alias\` a propósito. Con \`alias\`, nginx concatena la ruta con
     # el URI COMPLETO en lugar de con el resto, y el try_files de abajo busca
     # el archivo donde no está; es un fallo conocido de nginx que nunca se
-    # arregló. Con `root`, /media/foo.webp se resuelve a ${DIR_MEDIOS}/foo.webp
+    # arregló. Con \`root\`, /media/foo.webp se resuelve a ${DIR_MEDIOS}/foo.webp
     # —por eso la carpeta tiene que llamarse «media»— y try_files funciona.
     location /media/ {
         root ${RAIZ_MEDIOS};
@@ -1147,7 +1429,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
-    location / {
+    location / {${BLOQUE_CANONICO}
         proxy_pass http://127.0.0.1:${APP_PORT};
         proxy_http_version 1.1;
 
@@ -1242,6 +1524,8 @@ accion_estado() {
   echo; log "Fotos (las ESCRIBE el contenedor, las SIRVE nginx):"
   verificar_medios || true
 
+  echo; informe_puertos
+
   echo; log "Nginx del host:"
   systemctl is-active nginx >/dev/null 2>&1 && ok "  activo." \
     || warn "  inactivo. Los sitios de la VPS no se están sirviendo."
@@ -1313,6 +1597,13 @@ ejecutar_accion() {
       preparar_medios
       verificar_medios || exit 1
       ok "Listo. Recarga con Ctrl-Shift-R para saltarte la caché."; exit 0 ;;
+    puertos)
+      echo
+      informe_puertos
+      echo
+      log "Asignación oficial de la VPS:"
+      mapa_de_puertos
+      exit 0 ;;
     respaldo) respaldar_db; exit 0 ;;
     limpiar-docker) limpiar_residuos_docker; exit 0 ;;
     rollback) rollback_db; exit 0 ;;
@@ -1484,6 +1775,42 @@ probe() {   # probe <ruta> <esperado> <descripción>
   [ "$code" = "$2" ] && ok "$3 → $code" || warn "$3 → $code (esperado $2)"
 }
 
+# Lo que miran los buscadores. Son comprobaciones aparte de `probe` porque un
+# 200 aquí no basta: el SPA devuelve su index.html para CUALQUIER ruta que no
+# reconozca, así que un /robots.txt que se perdió en el build responde 200 con
+# una página HTML y Google no encuentra ni una sola regla. Hay que mirar lo que
+# viene dentro, no el código.
+probe_texto() { # probe_texto <ruta> <patrón> <descripción>
+  local cuerpo
+  cuerpo="$(curl -sk --max-time 20 \
+            --resolve "$DOMAIN:443:127.0.0.1" --resolve "$DOMAIN:80:127.0.0.1" \
+            "$ESQUEMA://$DOMAIN$1" 2>/dev/null)" || true
+  if [ -z "$cuerpo" ]; then
+    warn "$3 → sin respuesta"
+  elif printf '%s' "$cuerpo" | grep -qi -- "$2"; then
+    ok "$3 → correcto"
+  elif printf '%s' "$cuerpo" | grep -qi '<!DOCTYPE html'; then
+    warn "$3 → devolvió el index.html del SPA; el archivo no llegó al build."
+  else
+    warn "$3 → responde, pero no contiene «$2»."
+  fi
+}
+
+# El panel y la tienda son la MISMA página para el servidor (react-router), así
+# que la única forma de que un buscador no indexe /admin es esta cabecera. Si
+# se cae, no se nota hasta que la pantalla de acceso aparece en Google.
+probe_noindex() {
+  local cabeceras
+  cabeceras="$(curl -skI --max-time 20 \
+               --resolve "$DOMAIN:443:127.0.0.1" --resolve "$DOMAIN:80:127.0.0.1" \
+               "$ESQUEMA://$DOMAIN/admin" 2>/dev/null)" || true
+  if printf '%s' "$cabeceras" | grep -qi '^x-robots-tag:.*noindex'; then
+    ok "el panel va con noindex → correcto"
+  else
+    warn "el panel NO manda X-Robots-Tag: noindex. Revisa frontend/nginx.conf."
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # 10 bis. Limpieza de residuos de Docker
 # ---------------------------------------------------------------------------
@@ -1569,9 +1896,13 @@ comun_main() {
   cd "$APP_DIR"
   parsear_opciones "$@"
 
+  # Se guarda ANTES de rellenarlo con el defecto: es la única forma de
+  # distinguir «me han pedido el 8523» de «nadie ha dicho nada, usa el 8520».
+  APP_PORT_SOLICITADO="${APP_PORT:-}"
+
   DOMAIN="${DOMAIN:-$DOMINIO_DEFECTO}"
   APP_PORT="${APP_PORT:-$APP_PORT_DEFECTO}"
-  CERTBOT_EMAIL="${CERTBOT_EMAIL:-${LETSENCRYPT_EMAIL:-artuciiz@gmail.com}}"
+  CERTBOT_EMAIL="${CERTBOT_EMAIL:-${LETSENCRYPT_EMAIL:-}}"
   CERTBOT_STAGING="${CERTBOT_STAGING:-0}"
   DOMAIN_ALIASES="${DOMAIN_ALIASES:-}"
 
@@ -1582,7 +1913,7 @@ comun_main() {
   # nginx, certbot, postgres, chown); el resto se queda en Docker.
   local necesita_root=1
   case "$ACCION" in
-    estado|ver-logs|reiniciar|abajo|admin|shell|migrar|sembrar|respaldo|rollback|check|cron|limpiar-docker)
+    estado|puertos|ver-logs|reiniciar|abajo|admin|shell|migrar|sembrar|respaldo|rollback|check|cron|limpiar-docker)
       necesita_root=0 ;;
   esac
   [ "$MODO" = "actualizar" ] && [ -z "$ACCION" ] && necesita_root=0
@@ -1674,16 +2005,24 @@ comun_main() {
   fi
   # --check promete no tocar nada, y un backfill silencioso durante un --ssl
   # sería una sorpresa desagradable a las tres de la mañana.
+  # El puerto se decide aquí, antes de escribir el .env: así lo que queda
+  # guardado es el puerto realmente elegido y no el que se dio por supuesto.
+  [ -z "$ACCION" ] && resolver_puerto
+
   if [ -n "$ACCION" ]; then :
   elif [ ! -f "$ENV_FILE" ]; then generar_env
   else backfill_env
   fi
 
+  # OJO: cargar_env reexporta APP_PORT desde el archivo y pisaría el que
+  # acabamos de resolver. Se guarda y se restaura.
+  local puerto_resuelto="${APP_PORT:-}"
   cargar_env "$ENV_FILE"
   unset COMPOSE_FILE
   DOMAIN="${DOMAIN:-$DOMINIO_DEFECTO}"
-  APP_PORT="${APP_PORT:-$APP_PORT_DEFECTO}"
-  CERTBOT_EMAIL="${LETSENCRYPT_EMAIL:-${CERTBOT_EMAIL:-admin@$DOMAIN}}"
+  APP_PORT="${puerto_resuelto:-${APP_PORT:-$APP_PORT_DEFECTO}}"
+  [ -z "$ACCION" ] && fijar_env APP_PORT "$APP_PORT"
+  CERTBOT_EMAIL="${LETSENCRYPT_EMAIL:-${CERTBOT_EMAIL:-}}"
   chmod 600 "$ENV_FILE" 2>/dev/null || true
 
   [ -z "$ACCION" ] && { mkdir -p "$BACKUP_DIR"; preparar_medios; }
@@ -1716,41 +2055,12 @@ comun_main() {
   log "Preparando la base en el Postgres del host…"
   asegurar_base
 
-  # ── Puerto libre ──────────────────────────────────────────────────────────
-  log "Comprobando el puerto local ${APP_PORT}…"
-  # El `|| true` es necesario: con `set -e` + pipefail, un grep sin
-  # coincidencias (puerto libre, el caso normal) haría fallar la asignación.
-  local ocupa ajeno
-  ocupa="$(proceso_en_puerto "$APP_PORT")" || true
-  if [ -n "$ocupa" ]; then
-    ajeno="$(contenedor_en_puerto "$APP_PORT")" || true
-    if [ "$ocupa" = "docker-proxy" ] && [ -z "$ajeno" ]; then
-      local propio; propio="$(contenedor_propio_en_puerto "$APP_PORT")" || true
-      ok "Puerto ${APP_PORT}: lo usa este mismo stack${propio:+ (${propio})}; Compose lo reemplazará."
-    else
-      err "El puerto ${APP_PORT} está ocupado por '${ocupa}'${ajeno:+ (contenedor ${ajeno})}."
-      err "Mapa de puertos de la VPS:"
-      mapa_de_puertos >&2
-      err "Elige otro libre:  APP_PORT=8521 sudo ./deploy.sh   (o edítalo en el .env)"
-      exit 1
-    fi
-  else
-    ok "Puerto ${APP_PORT}: libre."
-  fi
-
-  # ── DNS (aviso, no bloqueante) ────────────────────────────────────────────
+  # ── DNS y certificado ─────────────────────────────────────────────────────
+  # El puerto ya se resolvió más arriba (resolver_puerto), antes de escribir
+  # el .env. Aquí sólo queda comprobar a dónde apunta el dominio.
   if [ "$MODO" = "completo" ] && [ "$DOMAIN" != "localhost" ]; then
-    log "Verificando a dónde resuelve ${DOMAIN}…"
-    local resuelve ip_publica
-    resuelve="$(getent hosts "$DOMAIN" 2>/dev/null | awk '{print $1}' | head -n1 || true)"
-    ip_publica="${SERVER_IP:-$(curl -fsS --max-time 5 https://api.ipify.org 2>/dev/null || true)}"
-    if [ -z "$resuelve" ]; then
-      warn "${DOMAIN} no resuelve todavía. Si el certificado falla, revisa el registro A."
-    elif [ -n "$ip_publica" ] && [ "$resuelve" != "$ip_publica" ]; then
-      warn "DNS: ${DOMAIN} resuelve a ${resuelve}, pero esta máquina es ${ip_publica}."
-    else
-      ok "DNS correcto: ${DOMAIN} -> ${resuelve}"
-    fi
+    log "Verificando el DNS de ${DOMAIN}…"
+    verificar_dns
   fi
 
   # ── Levantar ──────────────────────────────────────────────────────────────
@@ -1829,6 +2139,9 @@ comun_main() {
   probe "/" "200" "la tienda carga"
   probe "/admin" "200" "el panel carga"
   probe "/api/v1/productos" "200" "el catálogo responde"
+  probe_texto "/robots.txt"  "Sitemap:"  "robots.txt"
+  probe_texto "/sitemap.xml" "<urlset"   "sitemap.xml"
+  probe_noindex
 
   # ── Resumen ───────────────────────────────────────────────────────────────
   echo

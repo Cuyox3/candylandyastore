@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Candylandia Store — mapa del sitio.
+
+  Una sola dirección, porque la tienda es una sola página: las secciones
+  (#productos, #mayoreo, #faq…) son anclas dentro de ella, no URLs propias, y
+  listarlas aquí sería decirle a Google que existen páginas que no existen.
+
+  Si algún día el catálogo pasa a tener una página por producto, este archivo
+  tiene que generarse desde la base de datos y no seguir escrito a mano.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://candylandiastore.mx/</loc>
+    <lastmod>2026-09-24</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

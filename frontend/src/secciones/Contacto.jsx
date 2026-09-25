@@ -82,11 +82,11 @@ Mensaje: ${datos.mensaje.trim()}`;
   }
 
   return (
-    <section className="section" id="contacto">
+    <section className="section" id="contacto" aria-labelledby="contacto-titulo">
       <div className="container">
         <div className="section-head reveal">
           <span className="eyebrow">Contáctanos</span>
-          <h2>Hablemos de <span className="grad-text">dulces</span></h2>
+          <h2 id="contacto-titulo">Hablemos de <span className="grad-text">dulces</span></h2>
           <p>Escríbenos y te respondemos el mismo día. También puedes visitarnos en la tienda.</p>
         </div>
 

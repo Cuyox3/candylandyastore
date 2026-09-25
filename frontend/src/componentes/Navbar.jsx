@@ -17,7 +17,19 @@ export default function Navbar({ inicio = '/', enlaces = [], activa = '', bajado
     <header className={'navbar' + (bajado ? ' scrolled' : '')} id="navbar">
       <div className="container nav-inner">
         <a href={inicio} className="brand" aria-label="Candylandia Store - Inicio">
-          <img src="/assets/logo.png" alt="Logo de Candylandia Store" />
+          {/* El logo es lo primero que se pinta y el PNG pesa 240 KB. El WebP
+              son 29 y se ve igual. El width/height son los del archivo: el CSS
+              le pone la altura real, pero el navegador necesita la proporción
+              para no mover la barra cuando la imagen aterrice. */}
+          <picture>
+            <source srcSet="/assets/logo.webp" type="image/webp" />
+            <img
+              src="/assets/logo.png"
+              alt="Candylandia Store"
+              width="540" height="452"
+              fetchPriority="high" decoding="async"
+            />
+          </picture>
         </a>
 
         <nav className={'nav-links' + (abierto ? ' open' : '')} id="navLinks" aria-label="Navegación principal">

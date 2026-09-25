@@ -20,7 +20,15 @@ export default function Footer() {
     <footer className="footer">
       <div className="container footer-grid">
         <div className="footer-brand">
-          <img src="/assets/logo.png" alt="Candylandia Store" />
+          <picture>
+            <source srcSet="/assets/logo.webp" type="image/webp" />
+            <img
+              src="/assets/logo.png"
+              alt="Candylandia Store"
+              width="540" height="452"
+              loading="lazy" decoding="async"
+            />
+          </picture>
           <p>Dulces de importación seleccionados a mano. Traemos el mundo a tu antojo desde 2021.</p>
         </div>
         <div className="footer-col">
@@ -42,7 +50,10 @@ export default function Footer() {
           <a href="#faq">Formas de pago</a>
           <a href="#faq">Devoluciones</a>
           <a href="#contacto">Soporte</a>
-          <Link to="/admin">Panel de administración</Link>
+          {/* nofollow porque /admin es noindex: no tiene sentido mandar a
+              Google a rastrear una pantalla de acceso desde todas las
+              páginas del sitio. */}
+          <Link to="/admin" rel="nofollow">Panel de administración</Link>
         </div>
       </div>
       <FooterBottom>

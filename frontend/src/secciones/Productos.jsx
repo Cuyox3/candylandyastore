@@ -16,15 +16,19 @@ export default function Productos({ productos, categorias, filtro, onFiltrar, ca
   }
 
   return (
-    <section className="section section-alt" id="productos">
+    <section className="section section-alt" id="productos" aria-labelledby="productos-titulo">
       <div className="container">
         <div className="section-head reveal">
           <span className="eyebrow">Productos</span>
-          <h2>Nuestros <span className="grad-text">consentidos</span></h2>
+          <h2 id="productos-titulo">Nuestros <span className="grad-text">consentidos</span></h2>
           <p>Una probadita del catálogo. Tenemos más de 450 productos en tienda y llegan novedades cada semana.</p>
         </div>
 
-        <div className="filters reveal" id="filters" aria-label="Filtrar productos por categoría">
+        {/* Sin role, el aria-label de un <div> lo ignoran los lectores de
+            pantalla: sólo se anuncia en elementos que tienen un papel. Con
+            role="group" los seis botones se presentan como lo que son. */}
+        <div className="filters reveal" id="filters" role="group"
+             aria-label="Filtrar productos por categoría">
           <button
             className={'filter' + (filtro === 'todos' ? ' active' : '')}
             onClick={() => onFiltrar('todos')}

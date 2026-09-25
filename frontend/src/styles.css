@@ -50,7 +50,20 @@ body{
   overflow-x:hidden;
   -webkit-font-smoothing:antialiased;
 }
-img{ max-width:100%; display:block; }
+/* El `height:auto` va de la mano de los atributos width/height del HTML.
+   Esos atributos son una pista de presentación: el navegador los traduce a
+   `height:452px` y, en cuanto el CSS le da otra anchura, la imagen sale
+   estirada. Con height:auto vuelven a hacer lo que se espera de ellos —dar
+   la proporción para reservar el hueco antes de que la imagen llegue— sin
+   imponer la altura. Las reglas que sí fijan altura (.brand img,
+   .card-media .card-img) son más específicas y siguen mandando. */
+img{ max-width:100%; height:auto; display:block; }
+/* Las imágenes de marca van dentro de un <picture> para ofrecer el WebP.
+   `display:contents` borra ese envoltorio del cálculo de la maqueta, así
+   que el <img> sigue siendo hijo directo de su contenedor flex o grid y
+   todas las reglas de abajo (.brand img, .about-frame img…) siguen
+   funcionando igual que cuando el <img> estaba suelto. */
+picture{ display:contents; }
 a{ color:inherit; text-decoration:none; }
 ul{ margin:0; padding:0; list-style:none; }
 h1,h2,h3,h4{ font-family:var(--font-title); line-height:1.15; margin:0 0 .5em; color:var(--purple-deep); }
