@@ -643,6 +643,28 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 .gate-card h2{ font-size:1.6rem; margin-bottom:.3em; }
 .gate-card p{ color:var(--ink-soft); font-size:.95rem; }
 
+/* «Ver la clave» de la pantalla de acceso.
+   Hay que deshacer a mano lo que .field impone a lo que lleva dentro: sus
+   etiquetas son display:block en negrita morada, y sus inputs miden el 100%
+   con 13 px de relleno y borde de 2 px — aplicado a una casilla, sale una
+   barra del ancho del formulario en vez de un cuadrito.
+
+   El selector lleva `label` a propósito: `.field label` pesa (0,1,1) y a un
+   `.ver-clave` pelado (0,1,0) le gana, así que el display:block seguía puesto
+   y el `gap` no hacía nada —sólo vale en flex— y la casilla salía pegada al
+   texto. */
+.field label.ver-clave{
+  display:inline-flex; align-items:center; gap:8px;
+  margin:10px 0 0; font-weight:600; font-size:.86rem;
+  color:var(--ink-soft); cursor:pointer; user-select:none;
+  transition:color .2s ease;
+}
+.field label.ver-clave:hover{ color:var(--purple-mid); }
+.field label.ver-clave input[type="checkbox"]{
+  width:auto; margin:0; padding:0; border:0; background:none;
+  accent-color:var(--pink); cursor:pointer;
+}
+
 /* Botón de cerrar sesión en la barra (no usa el blanco de .nav-cta) */
 .nav-logout{ margin-left:8px; padding:10px 20px; font-size:.92rem; }
 

@@ -5,6 +5,9 @@ Es lo que llama deploy.sh:
 
     python -m app.cli admin [usuario] [password]   crea o actualiza el admin
     python -m app.cli sembrar [--forzar]           rellena el catálogo base
+    python -m app.cli sembrar --si-vacia           ídem, pero sólo si no hay
+                                                   catálogo todavía (es lo que
+                                                   corre en cada despliegue)
     python -m app.cli migrar                       crea las tablas que falten
     python -m app.cli listar-usuarios
     python -m app.cli estado
@@ -20,7 +23,7 @@ import sys
 from sqlalchemy import text
 
 from .database import Base, SesionLocal, motor
-from .models import Mensaje, Producto, Suscriptor, Usuario
+from .models import Categoria, Mensaje, Producto, Suscriptor, Usuario
 from .security import cifrar
 
 
@@ -36,11 +39,25 @@ def cmd_migrar() -> int:
     return 0
 
 
-def cmd_sembrar(forzar: bool) -> int:
+def cmd_sembrar(forzar: bool, si_vacia: bool = False) -> int:
     from .seed import sembrar
 
     _crear_tablas()
     with SesionLocal() as db:
+        # `--si-vacia` es lo que corre en CADA despliegue, y por eso existe.
+        #
+        # Sembrar sin más no pisa un producto que ya está, pero sí vuelve a
+        # meter los de fábrica cuyo slug ya no aparece — y eso no deja la base
+        # como estaba: al dueño que borró un dulce desde el panel le reaparece
+        # en el siguiente --update, y a quien reemplazó el catálogo por el suyo
+        # le caen encima los 16 de ejemplo.
+        #
+        # Es la misma guarda que hace el arranque en main.py: si la base ya
+        # tiene algo, el catálogo es del dueño y aquí no se toca nada. Para
+        # volver al de fábrica está `--sembrar` a mano, con o sin `--forzar`.
+        if si_vacia and (db.query(Producto).count() or db.query(Categoria).count()):
+            print("La base ya tiene catálogo: no se siembra nada.")
+            return 0
         cats, prods = sembrar(db, forzar=forzar)
     print(f"Sembrado: {cats} categoría(s) y {prods} producto(s) nuevos.")
     if forzar:
@@ -111,7 +128,7 @@ def main(argv: list[str]) -> int:
     if orden == "admin":
         return cmd_admin(resto)
     if orden == "sembrar":
-        return cmd_sembrar("--forzar" in resto)
+        return cmd_sembrar("--forzar" in resto, "--si-vacia" in resto)
     if orden == "migrar":
         return cmd_migrar()
     if orden == "listar-usuarios":

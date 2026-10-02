@@ -10,6 +10,7 @@ import { useState } from 'react';
 export default function Acceso({ onEntrar }) {
   const [usuario, setUsuario] = useState('');
   const [clave, setClave]     = useState('');
+  const [verClave, setVerClave] = useState(false);
   const [msg, setMsg]         = useState('');
   const [entrando, setEntrando] = useState(false);
 
@@ -57,11 +58,25 @@ export default function Acceso({ onEntrar }) {
           <div className="field">
             <label className="sr-only" htmlFor="clave">Clave de acceso</label>
             <input
-              type="password" id="clave" name="clave" placeholder="Clave de acceso"
+              type={verClave ? 'text' : 'password'}
+              id="clave" name="clave" placeholder="Clave de acceso"
               autoComplete="current-password" required
               className={fallo ? 'invalid' : ''}
               value={clave} onChange={(e) => setClave(e.target.value)}
             />
+
+            {/* Para comprobar lo que se escribió antes de darle a Entrar: con la
+                clave oculta, un dedo de más en el móvil sólo se nota cuando el
+                servidor ya contestó que no. La casilla es una casilla de verdad
+                —y no un botón con un ojo— para que diga en palabras si la clave
+                está a la vista, que es lo que importa si hay alguien al lado. */}
+            <label className="ver-clave">
+              <input
+                type="checkbox" checked={verClave}
+                onChange={(e) => setVerClave(e.target.checked)}
+              />
+              {verClave ? 'Ocultar la clave 🙈' : 'Ver la clave 👁️'}
+            </label>
           </div>
 
           <button type="submit" className="btn btn-pink btn-lg btn-block" disabled={entrando}>
@@ -69,10 +84,6 @@ export default function Acceso({ onEntrar }) {
           </button>
 
           <p className={'form-msg' + (fallo ? ' error' : '')} id="gateMsg" role="status">{msg}</p>
-          <small className="form-note">
-            El usuario y la clave se comprueban en el servidor. Para crearlos o cambiarlos:
-            <code> ./deploy.sh --admin</code>
-          </small>
         </form>
       </div>
     </section>

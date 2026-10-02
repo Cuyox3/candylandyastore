@@ -2095,15 +2095,21 @@ comun_main() {
   # --update no cambia la imagen del backend, Compose no recrea el contenedor,
   # el arranque no se vuelve a ejecutar y una tabla nueva jamás se crea.
   #
-  # Las dos órdenes son idempotentes: `migrar` sólo crea lo que falta y
-  # `sembrar` no pisa un producto que ya existe (se identifican por su slug).
+  # Ninguna de las dos toca un dato que ya esté guardado: `migrar` sólo crea
+  # las tablas que falten —jamás borra ni altera una columna— y `--si-vacia`
+  # hace que sembrar no entre si la base ya tiene catálogo.
+  #
+  # Ese `--si-vacia` no es adorno. Sin él, sembrar vuelve a meter los productos
+  # de fábrica cuyo slug no encuentra, así que cada --update le devolvía a la
+  # tienda los dulces que el dueño había quitado desde el panel, y a quien
+  # tenía su propio catálogo le añadía encima los 16 de ejemplo.
   log "Creando las tablas que falten…"
   cli migrar >/dev/null 2>&1 \
     && ok "Esquema al día." \
     || warn "No se pudieron crear las tablas. Revísalo:  ./deploy.sh --ver-logs"
 
-  log "Sembrando el catálogo base…"
-  cli sembrar >/dev/null 2>&1 \
+  log "Sembrando el catálogo base (sólo si la base está vacía)…"
+  cli sembrar --si-vacia >/dev/null 2>&1 \
     && ok "Catálogo al día." \
     || warn "No se pudo sembrar el catálogo. Revísalo:  ./deploy.sh --ver-logs"
 
