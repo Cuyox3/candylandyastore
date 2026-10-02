@@ -106,8 +106,21 @@ class Ajustes(BaseSettings):
 
     @property
     def correo_listo(self) -> bool:
-        """¿Hay bastante configurado como para intentar mandar un correo?"""
-        return bool(self.CORREO_CONTACTO and self.SMTP_HOST)
+        """
+        ¿Hay bastante configurado como para que un correo tenga posibilidades
+        de salir?
+
+        Lo de la contraseña no es un detalle: el .env se rellena solo al
+        desplegar y SMTP_PASSWORD llega VACÍA a propósito (hay que generar una
+        contraseña de aplicación a mano). Sin este último «and», el sitio se
+        creería capaz de mandar correos y le ofrecería al cliente un botón que
+        siempre acaba en un fallo de autenticación.
+        """
+        if not (self.CORREO_CONTACTO and self.SMTP_HOST):
+            return False
+        # Un servidor sin usuario es un relevo que no pide credenciales; con
+        # usuario, la contraseña es obligatoria.
+        return bool(self.SMTP_PASSWORD) if self.SMTP_USUARIO else True
 
     @property
     def remitente(self) -> str:

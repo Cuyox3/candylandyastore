@@ -170,6 +170,10 @@ def configuracion():
         "sitio": ajustes.SITE_NAME,
         "whatsapp": ajustes.WHATSAPP,
         "media_url": ajustes.MEDIA_URL,
+        # Si el SMTP no está configurado, el formulario de contacto no enseña
+        # el botón de «Enviar por correo»: ofrecerlo sabiendo que no va a salir
+        # ningún correo es prometerle algo al cliente que no se va a cumplir.
+        "correo": ajustes.correo_listo,
     }
 
 

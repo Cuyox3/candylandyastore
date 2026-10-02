@@ -10,7 +10,12 @@
 export const CONFIG = {
   whatsapp: '5215630450041',
   negocio: 'Candylandia Store',
-  correo: 'candylandiaviveros@gmail.com'
+  correo: 'candylandiaviveros@gmail.com',
+  direccion: 'C. Viveros de la Hacienda 35, Habit. Viveros del Valle, 54060 Tlalnepantla, Méx.',
+  /* ¿Puede el servidor mandar correos? Lo dice /api/v1/config al arrancar.
+     Empieza en false para no enseñar el botón de «Enviar por correo» durante
+     el parpadeo inicial si resulta que el SMTP no está configurado. */
+  correoActivo: false
 };
 
 export function waLink(texto) {
@@ -29,6 +34,30 @@ export function telefonoBonito(numero = CONFIG.whatsapp) {
   const nacional = digitos.replace(/^521?/, '');
   if (nacional.length !== 10) return '+' + digitos;   // otro país: se deja crudo
   return `+52 ${nacional.slice(0, 2)} ${nacional.slice(2, 6)} ${nacional.slice(6)}`;
+}
+
+/* Enlace al mapa, con la app que le toque a cada quien.
+
+   En iPhone y iPad se abre Mapas (maps.apple.com); en lo demás, Google Maps.
+   Mandar a un iPhone a Google Maps no es un desastre, pero si no tiene la app
+   instalada acaba en el navegador pidiendo que se la descargue, cuando el
+   sistema ya trae un mapa que sabe abrir esa dirección.
+
+   La detección mira también `maxTouchPoints` porque el iPad de iPadOS 13 en
+   adelante miente en el userAgent y se presenta como un Mac de escritorio;
+   sin esa comprobación, a los iPad se les manda a Google Maps. */
+export function esApple() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
+export function mapaUrl(direccion = CONFIG.direccion) {
+  const q = encodeURIComponent(direccion);
+  return esApple()
+    ? `https://maps.apple.com/?q=${q}`
+    : `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
 /* =========================================================

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api';
-import { CONFIG, REDES, telefonoBonito, waLink } from '../config';
+import { CONFIG, REDES, mapaUrl, telefonoBonito, waLink } from '../config';
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const VACIO = { nombre:'', email:'', tel:'', motivo:'', mensaje:'' };
@@ -28,16 +28,18 @@ export default function Contacto() {
   const [datos, setDatos]   = useState(VACIO);
   const [malos, setMalos]   = useState({});
   const [msg, setMsg]       = useState({ texto:'', error:false });
-  const [enviando, setEnviando] = useState(false);
+  /* Qué botón está trabajando: '' | 'whatsapp' | 'correo'. Guardar cuál (y no
+     un simple true) deja poner «Enviando…» sólo en el que se pulsó. */
+  const [enviando, setEnviando] = useState('');
 
   function cambiar(campo, valor) {
     setDatos((d) => ({ ...d, [campo]: valor }));
     if (malos[campo]) setMalos((m) => ({ ...m, [campo]: false }));
   }
 
-  async function enviar(e) {
-    e.preventDefault();
-
+  /* Los dos botones mandan lo MISMO al servidor —que es quien guarda y quien
+     manda el correo—; lo único que cambia es qué pasa después. */
+  async function procesar(canal) {
     const fallos = {
       nombre:  !datos.nombre.trim(),
       email:   !CORREO.test(datos.email.trim()),
@@ -51,7 +53,8 @@ export default function Contacto() {
       return;
     }
 
-    setEnviando(true);
+    setEnviando(canal);
+    let guardado = true;
     try {
       await api.contacto({
         nombre:  datos.nombre.trim(),
@@ -61,11 +64,26 @@ export default function Contacto() {
         mensaje: datos.mensaje.trim()
       });
     } catch (err) {
-      /* Se registra en la consola y se sigue: el cliente no tiene por qué
-         enterarse de que nuestro servidor tuvo un mal día. */
+      guardado = false;
       console.warn('No se pudo guardar el mensaje:', err.message);
     } finally {
-      setEnviando(false);
+      setEnviando('');
+    }
+
+    /* Por correo no hay segunda red: si la llamada falló, no se ha mandado
+       nada y hay que decirlo. Es justo lo contrario del botón de WhatsApp, que
+       se abre pase lo que pase porque el mensaje viaja igualmente. */
+    if (canal === 'correo') {
+      if (!guardado) {
+        setMsg({
+          texto:'No pudimos enviar tu mensaje. Inténtalo de nuevo o escríbenos por WhatsApp.',
+          error:true
+        });
+        return;
+      }
+      setMsg({ texto:'¡Enviado! Te respondemos a tu correo lo antes posible. 📧', error:false });
+      setDatos(VACIO);
+      return;
     }
 
     const texto =
@@ -75,10 +93,19 @@ Correo: ${datos.email.trim()}${datos.tel.trim() ? '\nTeléfono: ' + datos.tel.tr
 Motivo: ${datos.motivo}
 Mensaje: ${datos.mensaje.trim()}`;
 
+    /* Si el guardado falló, WhatsApp se abre igual: entre perder el registro y
+       perder al cliente, se pierde el registro. */
     window.open(waLink(texto), '_blank', 'noopener');
 
     setMsg({ texto:'¡Listo! Abrimos WhatsApp con tu mensaje. 💬', error:false });
     setDatos(VACIO);
+  }
+
+  /* El submit del formulario (y por tanto la tecla Enter) sigue siendo
+     WhatsApp, que es lo que este botón ha hecho siempre. */
+  function enviar(e) {
+    e.preventDefault();
+    procesar('whatsapp');
   }
 
   return (
@@ -100,10 +127,16 @@ Mensaje: ${datos.mensaje.trim()}`;
               <span className="info-ico" style={{ '--c1':'#F42A8F', '--c2':'#FF8AC4' }}>✉️</span>
               <div><strong>Correo</strong><span>{CONFIG.correo}</span></div>
             </a>
-            <div className="info-card">
+            {/* Al tocarla se abre la app de mapas del aparato con la tienda ya
+                buscada (Mapas en iPhone, Google Maps en lo demás). */}
+            <a className="info-card" href={mapaUrl()} target="_blank" rel="noopener noreferrer">
               <span className="info-ico" style={{ '--c1':'#29B6E8', '--c2':'#7FDBFF' }}>📍</span>
-              <div><strong>Tienda física</strong><span>Av. Dulce 123, Col. Centro, CDMX</span></div>
-            </div>
+              <div>
+                <strong>Tienda física</strong>
+                <span>{CONFIG.direccion}</span>
+                <span className="info-pista">Cómo llegar →</span>
+              </div>
+            </a>
             <div className="info-card">
               <span className="info-ico" style={{ '--c1':'#A05CD6', '--c2':'#D9A8F5' }}>🕒</span>
               <div><strong>Horario</strong><span>Lun a Sáb 10:00 – 20:00 · Dom 11:00 – 17:00</span></div>
@@ -171,11 +204,30 @@ Mensaje: ${datos.mensaje.trim()}`;
                         className={malos.mensaje ? 'invalid' : ''}
                         value={datos.mensaje} onChange={(e) => cambiar('mensaje', e.target.value)} />
             </div>
-            <button type="submit" className="btn btn-pink btn-lg btn-block" disabled={enviando}>
-              {enviando ? 'Enviando…' : 'Enviar por WhatsApp 💬'}
+            <button type="submit" className="btn btn-pink btn-lg btn-block" disabled={Boolean(enviando)}>
+              {enviando === 'whatsapp' ? 'Enviando…' : 'Enviar por WhatsApp 💬'}
             </button>
+
+            {/* Sólo si el servidor puede mandar correos de verdad: ofrecer el
+                botón con el SMTP a medias sería prometer un correo que nunca
+                sale. Lo dice /api/v1/config. */}
+            {CONFIG.correoActivo ? (
+              <button
+                type="button"
+                className="btn btn-correo btn-lg btn-block"
+                onClick={() => procesar('correo')}
+                disabled={Boolean(enviando)}
+              >
+                {enviando === 'correo' ? 'Enviando…' : 'Enviar por correo ✉️'}
+              </button>
+            ) : null}
+
             <p className={'form-msg' + (msg.error ? ' error' : '')} id="contactMsg" role="status">{msg.texto}</p>
-            <small className="form-note">Al enviar se abrirá WhatsApp con tu mensaje listo para mandar.</small>
+            <small className="form-note">
+              {CONFIG.correoActivo
+                ? 'Con WhatsApp se abre la app con tu mensaje listo; por correo te contestamos a la dirección que dejaste.'
+                : 'Al enviar se abrirá WhatsApp con tu mensaje listo para mandar.'}
+            </small>
           </form>
         </div>
       </div>

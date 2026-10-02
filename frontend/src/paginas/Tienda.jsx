@@ -78,6 +78,7 @@ export default function Tienda() {
         setProductos(prods);
         if (cfg && cfg.whatsapp) CONFIG.whatsapp = cfg.whatsapp;
         if (cfg && cfg.sitio)    CONFIG.negocio  = cfg.sitio;
+        CONFIG.correoActivo = Boolean(cfg && cfg.correo);
         setError('');
       } catch (err) {
         if (vivo) setError(err.message);

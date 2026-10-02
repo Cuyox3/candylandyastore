@@ -121,6 +121,19 @@ button{ font-family:inherit; }
 .btn-outline{ background:#fff; color:var(--purple-mid); border-color:var(--purple); }
 .btn-outline:hover{ background:var(--purple-tint); }
 
+/* El botón de «Enviar por correo», debajo del de WhatsApp. Va en morado y sin
+   relleno para que se lea como la segunda opción: el verde de WhatsApp manda,
+   y dos botones igual de llamativos sólo hacen dudar. */
+.btn-correo{ background:#fff; color:var(--purple-mid); border-color:var(--purple); }
+.btn-correo:hover{ background:var(--purple-tint); box-shadow:0 10px 24px rgba(110,42,140,.18); }
+/* Dos botones de ancho completo seguidos necesitan aire entre ellos. */
+.btn-block + .btn-block{ margin-top:10px; }
+
+/* Mientras se está enviando, los dos botones se apagan. Sin esto siguen
+   subiendo al pasar el ratón y parecen pulsables, que es justo lo que no son. */
+.btn:disabled{ opacity:.6; cursor:not-allowed; }
+.btn:disabled:hover{ transform:none; }
+
 /* ---------- Topbar promo ---------- */
 .topbar{
   background:linear-gradient(90deg, var(--purple-deep), var(--purple-mid), var(--pink));
@@ -468,6 +481,17 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 }
 .info-card strong{ display:block; font-family:var(--font-title); color:var(--purple-mid); line-height:1.2; }
 .info-card span{ font-size:.9rem; color:var(--ink-soft); }
+/* «Cómo llegar →» bajo la dirección: avisa de que la tarjeta se puede tocar,
+   que con una dirección larga no se da por hecho.
+
+   Lleva `.info-card` delante por peso: `.info-card span` vale (0,1,1) y a un
+   `.info-pista` suelto (0,1,0) le gana, así que el color y el tamaño de aquí
+   no llegarían a aplicarse. */
+.info-card .info-pista{
+  display:block; margin-top:4px; font-weight:700;
+  font-size:.82rem; color:var(--pink);
+}
+.info-card:hover .info-pista{ text-decoration:underline; }
 /* ---------- Síguenos ---------- */
 /* Separado de las tarjetas de contacto con un filete, para que se lea como un
    apartado propio y no como una tarjeta más de la columna. */
