@@ -3,7 +3,7 @@ import { api } from '../api';
 import { CONFIG, REDES, mapaUrl, telefonoBonito, waLink } from '../config';
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-const VACIO = { nombre:'', email:'', tel:'', motivo:'', mensaje:'' };
+const VACIO = { nombre: '', email: '', tel: '', motivo: '', mensaje: '' };
 
 const MOTIVOS = [
   'Quiero hacer un pedido',
@@ -25,9 +25,9 @@ const MOTIVOS = [
    perder al cliente, se pierde el registro.
    ========================================================= */
 export default function Contacto() {
-  const [datos, setDatos]   = useState(VACIO);
-  const [malos, setMalos]   = useState({});
-  const [msg, setMsg]       = useState({ texto:'', error:false });
+  const [datos, setDatos] = useState(VACIO);
+  const [malos, setMalos] = useState({});
+  const [msg, setMsg] = useState({ texto: '', error: false });
   /* Qué botón está trabajando: '' | 'whatsapp' | 'correo'. Guardar cuál (y no
      un simple true) deja poner «Enviando…» sólo en el que se pulsó. */
   const [enviando, setEnviando] = useState('');
@@ -41,15 +41,15 @@ export default function Contacto() {
      manda el correo—; lo único que cambia es qué pasa después. */
   async function procesar(canal) {
     const fallos = {
-      nombre:  !datos.nombre.trim(),
-      email:   !CORREO.test(datos.email.trim()),
-      motivo:  !datos.motivo.trim(),
+      nombre: !datos.nombre.trim(),
+      email: !CORREO.test(datos.email.trim()),
+      motivo: !datos.motivo.trim(),
       mensaje: !datos.mensaje.trim()
     };
     setMalos(fallos);
 
     if (Object.values(fallos).some(Boolean)) {
-      setMsg({ texto:'Revisa los campos marcados, por favor.', error:true });
+      setMsg({ texto: 'Revisa los campos marcados, por favor.', error: true });
       return;
     }
 
@@ -57,10 +57,10 @@ export default function Contacto() {
     let guardado = true;
     try {
       await api.contacto({
-        nombre:  datos.nombre.trim(),
-        email:   datos.email.trim(),
-        tel:     datos.tel.trim(),
-        motivo:  datos.motivo,
+        nombre: datos.nombre.trim(),
+        email: datos.email.trim(),
+        tel: datos.tel.trim(),
+        motivo: datos.motivo,
         mensaje: datos.mensaje.trim()
       });
     } catch (err) {
@@ -76,18 +76,18 @@ export default function Contacto() {
     if (canal === 'correo') {
       if (!guardado) {
         setMsg({
-          texto:'No pudimos enviar tu mensaje. Inténtalo de nuevo o escríbenos por WhatsApp.',
-          error:true
+          texto: 'No pudimos enviar tu mensaje. Inténtalo de nuevo o escríbenos por WhatsApp.',
+          error: true
         });
         return;
       }
-      setMsg({ texto:'¡Enviado! Te respondemos a tu correo lo antes posible. 📧', error:false });
+      setMsg({ texto: '¡Enviado! Te respondemos a tu correo lo antes posible. 📧', error: false });
       setDatos(VACIO);
       return;
     }
 
     const texto =
-`¡Hola ${CONFIG.negocio}! 🍭
+      `¡Hola ${CONFIG.negocio}! 🍭
 Nombre: ${datos.nombre.trim()}
 Correo: ${datos.email.trim()}${datos.tel.trim() ? '\nTeléfono: ' + datos.tel.trim() : ''}
 Motivo: ${datos.motivo}
@@ -97,7 +97,7 @@ Mensaje: ${datos.mensaje.trim()}`;
        perder al cliente, se pierde el registro. */
     window.open(waLink(texto), '_blank', 'noopener');
 
-    setMsg({ texto:'¡Listo! Abrimos WhatsApp con tu mensaje. 💬', error:false });
+    setMsg({ texto: '¡Listo! Abrimos WhatsApp con tu mensaje. 💬', error: false });
     setDatos(VACIO);
   }
 
@@ -120,17 +120,17 @@ Mensaje: ${datos.mensaje.trim()}`;
         <div className="contact-grid">
           <div className="contact-info reveal">
             <a className="info-card" href={`https://wa.me/${CONFIG.whatsapp}`} target="_blank" rel="noopener">
-              <span className="info-ico" style={{ '--c1':'#25D366', '--c2':'#8FF0B4' }}>💬</span>
+              <span className="info-ico" style={{ '--c1': '#25D366', '--c2': '#8FF0B4' }}>💬</span>
               <div><strong>WhatsApp</strong><span>{telefonoBonito()}</span></div>
             </a>
             <a className="info-card" href={`mailto:${CONFIG.correo}`}>
-              <span className="info-ico" style={{ '--c1':'#F42A8F', '--c2':'#FF8AC4' }}>✉️</span>
+              <span className="info-ico" style={{ '--c1': '#F42A8F', '--c2': '#FF8AC4' }}>✉️</span>
               <div><strong>Correo</strong><span>{CONFIG.correo}</span></div>
             </a>
             {/* Al tocarla se abre la app de mapas del aparato con la tienda ya
                 buscada (Mapas en iPhone, Google Maps en lo demás). */}
             <a className="info-card" href={mapaUrl()} target="_blank" rel="noopener noreferrer">
-              <span className="info-ico" style={{ '--c1':'#29B6E8', '--c2':'#7FDBFF' }}>📍</span>
+              <span className="info-ico" style={{ '--c1': '#29B6E8', '--c2': '#7FDBFF' }}>📍</span>
               <div>
                 <strong>Tienda física</strong>
                 <span>{CONFIG.direccion}</span>
@@ -138,12 +138,11 @@ Mensaje: ${datos.mensaje.trim()}`;
               </div>
             </a>
             <div className="info-card">
-              <span className="info-ico" style={{ '--c1':'#A05CD6', '--c2':'#D9A8F5' }}>🕒</span>
-              <div><strong>Horario</strong><span>Lun a Sáb 10:00 – 20:00 · Dom 11:00 – 17:00</span></div>
+              <span className="info-ico" style={{ '--c1': '#A05CD6', '--c2': '#D9A8F5' }}>🕒</span>
+              <div><strong>Horario</strong><span>Lun a Sáb 11:00 – 19:00 · Dom 11:00 – 17:00</span></div>
             </div>
 
             {/* Síguenos.
-
                 Sale de REDES (config.js) y no de una lista escrita aquí, para
                 que el pie y el contacto no se puedan desincronizar cuando se
                 añada o se cambie una cuenta. */}
@@ -173,27 +172,27 @@ Mensaje: ${datos.mensaje.trim()}`;
             <div className="field">
               <label htmlFor="nombre">Nombre completo *</label>
               <input type="text" id="nombre" name="nombre" placeholder="¿Cómo te llamas?" required
-                     className={malos.nombre ? 'invalid' : ''}
-                     value={datos.nombre} onChange={(e) => cambiar('nombre', e.target.value)} />
+                className={malos.nombre ? 'invalid' : ''}
+                value={datos.nombre} onChange={(e) => cambiar('nombre', e.target.value)} />
             </div>
             <div className="field-row">
               <div className="field">
                 <label htmlFor="email">Correo *</label>
                 <input type="email" id="email" name="email" placeholder="tucorreo@ejemplo.com" required
-                       className={malos.email ? 'invalid' : ''}
-                       value={datos.email} onChange={(e) => cambiar('email', e.target.value)} />
+                  className={malos.email ? 'invalid' : ''}
+                  value={datos.email} onChange={(e) => cambiar('email', e.target.value)} />
               </div>
               <div className="field">
                 <label htmlFor="tel">Teléfono</label>
                 <input type="tel" id="tel" name="tel" placeholder="55 1234 5678"
-                       value={datos.tel} onChange={(e) => cambiar('tel', e.target.value)} />
+                  value={datos.tel} onChange={(e) => cambiar('tel', e.target.value)} />
               </div>
             </div>
             <div className="field">
               <label htmlFor="motivo">¿En qué te ayudamos? *</label>
               <select id="motivo" name="motivo" required
-                      className={malos.motivo ? 'invalid' : ''}
-                      value={datos.motivo} onChange={(e) => cambiar('motivo', e.target.value)}>
+                className={malos.motivo ? 'invalid' : ''}
+                value={datos.motivo} onChange={(e) => cambiar('motivo', e.target.value)}>
                 <option value="">Selecciona una opción</option>
                 {MOTIVOS.map((m) => <option key={m}>{m}</option>)}
               </select>
@@ -201,8 +200,8 @@ Mensaje: ${datos.mensaje.trim()}`;
             <div className="field">
               <label htmlFor="mensaje">Mensaje *</label>
               <textarea id="mensaje" name="mensaje" rows="5" placeholder="Cuéntanos qué se te antoja…" required
-                        className={malos.mensaje ? 'invalid' : ''}
-                        value={datos.mensaje} onChange={(e) => cambiar('mensaje', e.target.value)} />
+                className={malos.mensaje ? 'invalid' : ''}
+                value={datos.mensaje} onChange={(e) => cambiar('mensaje', e.target.value)} />
             </div>
             <button type="submit" className="btn btn-pink btn-lg btn-block" disabled={Boolean(enviando)}>
               {enviando === 'whatsapp' ? 'Enviando…' : 'Enviar por WhatsApp 💬'}
