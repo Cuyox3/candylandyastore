@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { CONFIG, REDES } from '../config';
 
 /* Pie de la tienda. El bloque de abajo (copyright + autoría) es el mismo que
    usa el panel, por eso vive en FooterBottom y se reutiliza. */
@@ -30,6 +31,25 @@ export default function Footer() {
             />
           </picture>
           <p>Dulces de importación seleccionados a mano. Traemos el mundo a tu antojo desde 2021.</p>
+
+          {/* Las mismas cuentas que el contacto, de la misma lista (REDES).
+              Aquí sólo el icono: el pie ya va apretado de texto y el nombre
+              se queda en el title y en la etiqueta para quien no lo ve. */}
+          <div className="footer-redes">
+            {REDES.map((red) => (
+              <a
+                key={red.nombre}
+                href={red.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={red.nombre}
+                aria-label={`${red.nombre} de ${CONFIG.negocio}`}
+                style={{ '--c1': red.c1, '--c2': red.c2 }}
+              >
+                <span aria-hidden="true">{red.emoji}</span>
+              </a>
+            ))}
+          </div>
         </div>
         <div className="footer-col">
           <h4>Tienda</h4>

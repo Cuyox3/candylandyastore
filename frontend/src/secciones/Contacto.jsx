@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../api';
-import { CONFIG, waLink } from '../config';
+import { CONFIG, REDES, telefonoBonito, waLink } from '../config';
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const VACIO = { nombre:'', email:'', tel:'', motivo:'', mensaje:'' };
@@ -94,11 +94,11 @@ Mensaje: ${datos.mensaje.trim()}`;
           <div className="contact-info reveal">
             <a className="info-card" href={`https://wa.me/${CONFIG.whatsapp}`} target="_blank" rel="noopener">
               <span className="info-ico" style={{ '--c1':'#25D366', '--c2':'#8FF0B4' }}>💬</span>
-              <div><strong>WhatsApp</strong><span>+52 55 1234 5678</span></div>
+              <div><strong>WhatsApp</strong><span>{telefonoBonito()}</span></div>
             </a>
-            <a className="info-card" href="mailto:hola@candylandiastore.com">
+            <a className="info-card" href={`mailto:${CONFIG.correo}`}>
               <span className="info-ico" style={{ '--c1':'#F42A8F', '--c2':'#FF8AC4' }}>✉️</span>
-              <div><strong>Correo</strong><span>hola@candylandiastore.com</span></div>
+              <div><strong>Correo</strong><span>{CONFIG.correo}</span></div>
             </a>
             <div className="info-card">
               <span className="info-ico" style={{ '--c1':'#29B6E8', '--c2':'#7FDBFF' }}>📍</span>
@@ -109,10 +109,30 @@ Mensaje: ${datos.mensaje.trim()}`;
               <div><strong>Horario</strong><span>Lun a Sáb 10:00 – 20:00 · Dom 11:00 – 17:00</span></div>
             </div>
 
-            <div className="socials">
-              <a href="#" aria-label="Instagram">Instagram</a>
-              <a href="#" aria-label="TikTok">TikTok</a>
-              <a href="#" aria-label="Facebook">Facebook</a>
+            {/* Síguenos.
+
+                Sale de REDES (config.js) y no de una lista escrita aquí, para
+                que el pie y el contacto no se puedan desincronizar cuando se
+                añada o se cambie una cuenta. */}
+            <div className="redes-bloque">
+              <h3 className="redes-titulo">Síguenos en nuestras redes</h3>
+              <p className="redes-texto">
+                Ahí sacamos lo que acaba de llegar, las ediciones limitadas y los antojos del mes.
+              </p>
+              <div className="socials">
+                {REDES.map((red) => (
+                  <a
+                    key={red.nombre}
+                    href={red.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`${red.nombre} de ${CONFIG.negocio}`}
+                    style={{ '--c1': red.c1, '--c2': red.c2 }}
+                  >
+                    <span aria-hidden="true">{red.emoji}</span> {red.nombre}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 

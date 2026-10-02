@@ -61,7 +61,29 @@ class Ajustes(BaseSettings):
     IMAGEN_PESO_MAX: int = 8 * 1024 * 1024  # 8 MB del archivo original
 
     # ── Contacto ───────────────────────────────────────────────────────────
-    WHATSAPP: str = "5215512345678"
+    WHATSAPP: str = "5215630450041"
+
+    # ── Correo ─────────────────────────────────────────────────────────────
+    # A dónde llegan los mensajes del formulario de contacto. Si se queda
+    # vacío no se manda nada: los mensajes siguen guardándose en la base y se
+    # leen desde el panel, que es como funcionaba antes de esto.
+    CORREO_CONTACTO: str = ""
+
+    # Servidor de salida. Con Gmail: smtp.gmail.com, puerto 587, y en
+    # SMTP_PASSWORD una «contraseña de aplicación» (Google no deja usar la del
+    # correo desde un programa; se saca en myaccount.google.com/apppasswords
+    # y hace falta tener la verificación en dos pasos encendida).
+    SMTP_HOST: str = ""
+    SMTP_PUERTO: int = 587
+    SMTP_USUARIO: str = ""
+    SMTP_PASSWORD: str = ""
+    # STARTTLS, que es lo del puerto 587. Con el 465 hay que ponerlo en False:
+    # ese puerto habla TLS desde el primer byte y no entiende el STARTTLS.
+    SMTP_TLS: bool = True
+    # El remitente. Vacío = el propio SMTP_USUARIO, que es lo que quiere casi
+    # cualquier servidor: mandar «de parte de» otra dirección acaba en spam o
+    # directamente rechazado.
+    CORREO_DESDE: str = ""
 
     @field_validator("DATABASE_URL")
     @classmethod
@@ -81,6 +103,15 @@ class Ajustes(BaseSettings):
     @property
     def cors(self) -> List[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def correo_listo(self) -> bool:
+        """¿Hay bastante configurado como para intentar mandar un correo?"""
+        return bool(self.CORREO_CONTACTO and self.SMTP_HOST)
+
+    @property
+    def remitente(self) -> str:
+        return self.CORREO_DESDE or self.SMTP_USUARIO or self.CORREO_CONTACTO
 
 
 @lru_cache

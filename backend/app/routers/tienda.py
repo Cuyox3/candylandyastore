@@ -5,11 +5,16 @@ Estos dos formularios ya funcionaban sin servidor (el newsletter guardaba el
 correo en el localStorage de quien se suscribía; el contacto abría WhatsApp y
 no dejaba rastro). Ahora quedan registrados, sin cambiar lo que ve el cliente:
 el contacto sigue abriendo WhatsApp igual.
+
+Además, un mensaje de contacto manda un aviso al correo de la tienda (ver
+correo.py). Es un extra, no un requisito: si el SMTP no está configurado o
+falla, el mensaje se guarda igual y se lee desde el panel.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from .. import correo
 from ..database import obtener_db
 from ..models import Mensaje, Suscriptor, Usuario
 from ..schemas import (
@@ -46,11 +51,33 @@ def listar_suscriptores(
 
 
 @router.post("/mensajes", response_model=Respuesta, status_code=201)
-def crear_mensaje(datos: MensajeCrear, db: Session = Depends(obtener_db)):
+def crear_mensaje(
+    datos: MensajeCrear,
+    tareas: BackgroundTasks,
+    db: Session = Depends(obtener_db),
+):
     mensaje = Mensaje(**datos.model_dump())
     mensaje.email = str(mensaje.email).lower().strip()
     db.add(mensaje)
     db.commit()
+
+    # El aviso por correo va DESPUÉS del commit y en segundo plano: lo que no
+    # puede fallar es el guardado, y un servidor de correo lento no tiene por
+    # qué dejar al cliente mirando el botón «Enviando…». Si no sale, queda en
+    # el log y el mensaje se lee igual desde el panel.
+    #
+    # Los campos se leen AQUÍ y se pasan ya como texto, no dentro de la tarea:
+    # el commit deja la fila expirada y la sesión se cierra al devolver la
+    # respuesta, así que leer `mensaje.nombre` más tarde intentaría recargarla
+    # con una sesión que ya no existe.
+    tareas.add_task(
+        correo.avisar,
+        nombre=mensaje.nombre,
+        email=mensaje.email,
+        tel=mensaje.tel,
+        motivo=mensaje.motivo,
+        texto=mensaje.mensaje,
+    )
     return Respuesta(detalle="Mensaje recibido.")
 
 

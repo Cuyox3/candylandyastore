@@ -8,13 +8,68 @@
    ========================================================= */
 
 export const CONFIG = {
-  whatsapp: '5215512345678',
-  negocio: 'Candylandia Store'
+  whatsapp: '5215630450041',
+  negocio: 'Candylandia Store',
+  correo: 'candylandiaviveros@gmail.com'
 };
 
 export function waLink(texto) {
   return 'https://wa.me/' + CONFIG.whatsapp + '?text=' + encodeURIComponent(texto);
 }
+
+/* El número como se escribe, a partir del que usa WhatsApp.
+
+   Se calcula en vez de llevarlo escrito aparte porque CONFIG.whatsapp lo pisa
+   el backend al arrancar (/api/v1/config): con el número a mano en el marcado,
+   cambiarlo en el .env dejaba la tienda enseñando el viejo. */
+export function telefonoBonito(numero = CONFIG.whatsapp) {
+  const digitos = String(numero).replace(/\D/g, '');
+  // Los móviles de México van a WhatsApp como 52 + 1 + diez dígitos. Ese 1 es
+  // cosa de WhatsApp y no se marca, así que tampoco se enseña.
+  const nacional = digitos.replace(/^521?/, '');
+  if (nacional.length !== 10) return '+' + digitos;   // otro país: se deja crudo
+  return `+52 ${nacional.slice(0, 2)} ${nacional.slice(2, 6)} ${nacional.slice(6)}`;
+}
+
+/* =========================================================
+   Las redes de la tienda, en un solo sitio.
+
+   Viven aquí y no repartidas por el marcado para que cambiar una cuenta sea
+   tocar una línea, no buscarla en el contacto y en el pie. Cada una lleva su
+   color de marca, que es lo que pinta el degradado de la pastilla.
+
+   `rel="noopener"` lo pone el componente que las dibuja: sin eso, la página
+   que se abre puede manipular la nuestra desde window.opener.
+   ========================================================= */
+export const REDES = [
+  {
+    nombre: 'Facebook',
+    emoji: '👍',
+    url: 'https://www.facebook.com/share/19ZWkt2otA/?mibextid=wwXIfr',
+    c1: '#1877F2', c2: '#6BA8F7'
+  },
+  {
+    nombre: 'Instagram',
+    emoji: '📸',
+    url: 'https://www.instagram.com/candylandiastoremx?stkn=MnpuZXoyM2VrcjRh',
+    c1: '#E1306C', c2: '#F7A8C4'
+  },
+  {
+    nombre: 'TikTok',
+    emoji: '🎵',
+    url: 'https://www.tiktok.com/@candylandiastoremx?_r=1',
+    c1: '#010101', c2: '#69C9D0'
+  },
+  {
+    /* El /c/ de este enlace no es un número de teléfono: abre el CATÁLOGO de
+       WhatsApp Business, que es otra pantalla distinta a la del chat. El chat
+       normal es el de waLink(), y los dos conviven a propósito. */
+    nombre: 'Catálogo en WhatsApp',
+    emoji: '🛍️',
+    url: 'https://wa.me/c/5215630450041',
+    c1: '#25D366', c2: '#8FF0B4'
+  }
+];
 
 /* Emojis sugeridos en el formulario del panel (venían de admin.js) */
 export const EMOJIS = ['🍫','🍬','🍭','🍪','🍡','🧁','🍩','🥤','🧋','🍜','🌈','🔥','🍯','🥜','🥚','🐻','🍮','🍊','🍓','🧃'];
