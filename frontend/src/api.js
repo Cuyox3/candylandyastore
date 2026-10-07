@@ -91,13 +91,26 @@ async function peticion(ruta, opciones = {}) {
   return datos;
 }
 
+/* El nombre del archivo que propone el servidor en Content-Disposition.
+   Devuelve '' si la cabecera no viene o no se entiende, y entonces quien
+   llama pone uno por defecto. */
+function nombreDeLaCabecera(respuesta) {
+  const cabecera = respuesta.headers.get('content-disposition') || '';
+  const conComillas = cabecera.match(/filename="([^"]+)"/i);
+  if (conComillas) return conComillas[1];
+  const sinComillas = cabecera.match(/filename=([^;]+)/i);
+  return sinComillas ? sinComillas[1].trim() : '';
+}
+
 /* ---------------------------------------------------------
    Tienda (público)
    --------------------------------------------------------- */
 export const api = {
   config:      ()        => peticion('/config'),
-  categorias:  ()        => peticion('/categorias'),
-  etiquetas:   ()        => peticion('/etiquetas'),
+  /* Con `todas` entran también las apagadas. La tienda nunca las pide; el
+     panel sí, porque tiene que poder volver a encenderlas. */
+  categorias:  (todas = false) => peticion('/categorias' + (todas ? '?incluir_inactivas=true' : '')),
+  etiquetas:   (todas = false) => peticion('/etiquetas'  + (todas ? '?incluir_inactivas=true' : '')),
 
   productos(cat = 'todos', buscar = '') {
     const params = new URLSearchParams();
@@ -134,6 +147,68 @@ export const api = {
   exportar:  ()      => peticion('/catalogo/exportar',  { autenticada:true }),
   importar:  (lista) => peticion('/catalogo/importar',  { method:'POST', autenticada:true, cuerpo:{ productos:lista } }),
   restaurar: ()      => peticion('/catalogo/restaurar', { method:'POST', autenticada:true }),
+
+  /* Categorías y etiquetas del panel. El listado lo da la tienda (arriba);
+     esto es lo que hace falta para administrarlas. */
+  crearCategoria: (datos) =>
+    peticion('/categorias', { method:'POST', autenticada:true, cuerpo:datos }),
+  editarCategoria: (slug, datos) =>
+    peticion(`/categorias/${encodeURIComponent(slug)}`, { method:'PATCH', autenticada:true, cuerpo:datos }),
+  quitarCategoria: (slug) =>
+    peticion(`/categorias/${encodeURIComponent(slug)}`, { method:'DELETE', autenticada:true }),
+
+  coloresEtiqueta: () => peticion('/colores-etiqueta'),
+  crearEtiqueta: (datos) =>
+    peticion('/etiquetas', { method:'POST', autenticada:true, cuerpo:datos }),
+  editarEtiqueta: (id, datos) =>
+    peticion(`/etiquetas/${id}`, { method:'PATCH', autenticada:true, cuerpo:datos }),
+  quitarEtiqueta: (id) =>
+    peticion(`/etiquetas/${id}`, { method:'DELETE', autenticada:true }),
+
+  /* Descargas: Excel y PDF.
+
+     No pasan por `peticion` porque eso devuelve texto o JSON, y aquí lo que
+     vuelve son bytes. Y no se puede usar un <a href> a secas: la descarga
+     necesita la cabecera Authorization, que un enlace no sabe mandar. Así que
+     se pide con fetch, se guarda en memoria y se dispara un clic sobre un
+     enlace temporal. */
+  async descargarCatalogo(formato) {
+    const respuesta = await fetch(`${BASE}/catalogo/exportar.${formato}`, {
+      headers: { Authorization: `Bearer ${sesion.leer()}` }
+    });
+
+    if (!respuesta.ok) {
+      if (respuesta.status === 401) {
+        sesion.borrar();
+        window.dispatchEvent(new CustomEvent(EVENTO_SIN_SESION));
+      }
+      /* El error sí viene en JSON: el servidor sólo manda bytes cuando todo
+         fue bien. */
+      const datos = await respuesta.json().catch(() => null);
+      throw new ErrorApi((datos && datos.detail) || `El servidor respondió ${respuesta.status}.`,
+                         respuesta.status);
+    }
+
+    const bytes = await respuesta.blob();
+    const nombre = nombreDeLaCabecera(respuesta) || `catalogo.${formato}`;
+    const url = URL.createObjectURL(bytes);
+    const enlace = document.createElement('a');
+    enlace.href = url;
+    enlace.download = nombre;
+    document.body.appendChild(enlace);
+    enlace.click();
+    enlace.remove();
+    /* Sin esto el blob se queda en memoria hasta que se recargue la página.
+       El retraso es porque revocarlo en el acto cancela la descarga en Safari. */
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    return nombre;
+  },
+
+  importarExcel(archivo) {
+    const formulario = new FormData();
+    formulario.append('archivo', archivo);
+    return peticion('/catalogo/importar-excel', { method:'POST', autenticada:true, formulario });
+  },
 
   subirImagen(archivo) {
     const formulario = new FormData();

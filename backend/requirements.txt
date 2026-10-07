@@ -16,3 +16,8 @@ bcrypt==4.2.1
 python-jose[cryptography]==3.3.0
 email-validator==2.2.0
 Pillow==11.0.0
+
+# Exportar e importar el catalogo en hoja de calculo y en PDF (panel).
+# Las dos son Python puro: no anaden nada que compilar en la imagen.
+openpyxl==3.1.5
+reportlab==4.2.5

@@ -333,6 +333,11 @@ button{ font-family:inherit; }
 }
 .tag.nuevo{ background:linear-gradient(135deg, var(--cyan), #4FD2FF); }
 .tag.top{ background:linear-gradient(135deg, var(--yellow), var(--orange)); color:var(--purple-deep); }
+/* Estos dos existen para que el panel pueda ofrecer más de dos colores al
+   crear etiquetas. La lista de aquí y la de COLORES en schemas.py van a la
+   par: un color que esté allí y no aquí sale en rosa sin que nada avise. */
+.tag.verde{ background:linear-gradient(135deg, #3FA34D, #8FD98A); }
+.tag.morado{ background:linear-gradient(135deg, var(--purple-mid), var(--purple)); }
 
 .card-body{ padding:18px 18px 20px; display:flex; flex-direction:column; flex:1; }
 .card-origin{ font-size:.8rem; font-weight:800; color:var(--cyan); letter-spacing:.03em; }
@@ -723,6 +728,16 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
 }
 .admin-head h2{ margin-bottom:.15em; }
 .admin-head p{ color:var(--ink-soft); margin:0; }
+.admin-head-botones{ display:flex; flex-wrap:wrap; gap:10px; }
+
+/* El «?» de la guía. La interrogación va en redondo para que se lea como un
+   botón de ayuda de toda la vida y no como una letra suelta del rótulo. */
+.btn-ayuda span{
+  display:inline-grid; place-items:center;
+  width:22px; height:22px; border-radius:50%;
+  background:var(--purple); color:#fff;
+  font-size:.85rem; line-height:1;
+}
 
 .admin-stats{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:28px; }
 .stat-chip{
@@ -754,6 +769,104 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
   display:flex; align-items:center; gap:10px;
 }
 .admin-panel > h3 + p{ color:var(--ink-soft); font-size:.9rem; margin-bottom:18px; }
+
+/* ---------- Listas editables (categorías y etiquetas) ---------- */
+.lista-cabecera{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; flex-wrap:wrap; margin-bottom:.2em;
+}
+.lista-cabecera h3{ font-size:1.25rem; margin:0; display:flex; align-items:center; gap:10px; }
+.admin-ayuda{ color:var(--ink-soft); font-size:.88rem; margin:0 0 16px; }
+
+.lista-nueva{
+  background:var(--purple-tint); border:2px dashed var(--purple);
+  border-radius:var(--radius-sm); padding:16px; margin-bottom:18px;
+}
+.lista-nueva .field{ margin-bottom:12px; }
+.lista-muestra{ font-size:.88rem; color:var(--ink-soft); margin:0 0 12px; }
+
+.lista-editable{ list-style:none; display:flex; flex-direction:column; gap:10px; }
+.lista-fila{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:var(--cream); border:2px solid var(--line);
+  border-radius:var(--radius-sm); padding:10px 12px;
+}
+.lista-campos{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; flex:1; min-width:0; }
+/* Los campos de estas filas son más bajos que los del formulario grande: aquí
+   caben seis en una línea y los 13 px de relleno de `.field input` los
+   partirían en tres renglones. */
+.lista-campos input[type="text"], .lista-campos select{
+  flex:1; min-width:120px; width:auto;
+  padding:8px 11px; font-size:.92rem; font-family:inherit; color:var(--ink);
+  border:2px solid var(--line); border-radius:var(--radius-sm);
+  background:#fff; outline:none;
+}
+.lista-campos input[type="text"]:focus, .lista-campos select:focus{ border-color:var(--pink); }
+.lista-orden{
+  width:66px; flex:none;
+  padding:8px 9px; font-size:.92rem; font-family:inherit; color:var(--ink);
+  border:2px solid var(--line); border-radius:var(--radius-sm); background:#fff; outline:none;
+}
+.lista-slug{
+  flex:none; font-size:.8rem; color:var(--ink-soft);
+  background:var(--purple-tint); border-radius:999px; padding:4px 10px;
+}
+
+/* La pastilla de la etiqueta, aquí y en la vista previa del formulario.
+   `.tag` nace con position:absolute porque en la tarjeta de la tienda va
+   clavada en la esquina de la foto; metida tal cual en estas filas se sale
+   del flujo y aterriza en la esquina del panel, donde no se ve. Se devuelve
+   al flujo sin tocar `.tag`, que es de la tienda. */
+.lista-campos .tag, .lista-muestra .tag{
+  position:static; flex:none; display:inline-block; white-space:nowrap;
+}
+.lista-check{
+  display:inline-flex; align-items:center; gap:6px; flex:none;
+  font-size:.85rem; font-weight:600; color:var(--ink-soft); cursor:pointer;
+}
+.lista-check input{ width:auto; margin:0; accent-color:var(--pink); cursor:pointer; }
+.lista-cuenta{ flex:none; font-size:.82rem; color:var(--ink-soft); font-weight:700; }
+.lista-acciones{ display:flex; gap:6px; flex:none; }
+
+.icono-btn{
+  width:34px; height:34px; border-radius:10px; flex:none;
+  display:grid; place-items:center; font-size:.95rem; cursor:pointer;
+  background:#fff; border:2px solid var(--line);
+  transition:border-color .2s ease, background .2s ease, transform .15s ease;
+}
+.icono-btn:hover:not(:disabled){ border-color:var(--purple); transform:translateY(-2px); }
+.icono-btn.peligro:hover:not(:disabled){ border-color:#E8547A; background:#FFF1F4; }
+.icono-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+/* ---------- Descargas y respaldo ---------- */
+.admin-descargas{
+  display:flex; flex-direction:column; gap:12px;
+  border-top:2px solid var(--line); padding-top:16px; margin-bottom:22px;
+}
+.descarga-grupo{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.descarga-titulo{
+  font-family:var(--font-title); font-weight:700; font-size:.82rem;
+  color:var(--purple-mid); min-width:132px;
+}
+/* «Restaurar el de fábrica» borra el catálogo: no puede verse igual que
+   «Descargar PDF», que estaba a dos botones de distancia. */
+.descarga-grupo .btn.peligro{ color:#D42B4B; border-color:#F2C2CE; }
+.descarga-grupo .btn.peligro:hover{ background:#FFF1F4; border-color:#E8547A; color:#D42B4B; }
+
+/* ---------- Guía del panel ---------- */
+.ayuda-intro{ color:var(--ink-soft); font-size:.95rem; margin-bottom:18px; }
+.ayuda-bloque{ margin-bottom:20px; }
+.ayuda-bloque h4{
+  font-size:1.05rem; color:var(--purple-mid); margin-bottom:10px;
+  padding-bottom:6px; border-bottom:2px solid var(--line);
+}
+.ayuda-paso{ display:grid; grid-template-columns:150px 1fr; gap:10px; margin-bottom:8px; }
+.ayuda-paso dt{ font-weight:700; color:var(--purple-mid); font-size:.88rem; }
+.ayuda-paso dd{ margin:0; color:var(--ink-soft); font-size:.9rem; line-height:1.5; }
+.ayuda-pie{
+  background:var(--pink-tint); border-radius:var(--radius-sm);
+  padding:12px 16px; font-size:.9rem; color:var(--purple-mid); font-weight:600; margin:0;
+}
 
 /* ---------- Extras del formulario ---------- */
 .chips{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
@@ -873,6 +986,14 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
   background:#fff; border-radius:var(--radius); padding:30px 26px;
   box-shadow:var(--shadow-lg); transform:translateY(14px) scale(.97);
   transition:transform .22s ease;
+  /* Sin esto, una ventana más alta que la pantalla deja sus botones fuera y
+     no hay manera de llegar a ellos: el fondo no rueda (es position:fixed) y
+     la caja tampoco. Pasaba con la guía del panel, que es larga.
+     Los 40 px son el padding de .modal, 20 por lado. */
+  max-height:calc(100vh - 40px);
+  overflow-y:auto;
+  /* Que al llegar al final no se ponga a rodar la página de detrás. */
+  overscroll-behavior:contain;
 }
 .modal.open .modal-box{ transform:none; }
 .modal-box h3{ margin-bottom:.35em; }
@@ -908,6 +1029,15 @@ a.info-card:hover{ transform:translateY(-4px); border-color:var(--pink-soft); }
   .admin-products{ grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:14px; }
   .admin-head{ flex-direction:column; align-items:stretch; }
   .admin-head .btn{ width:100%; }
+  .admin-head-botones{ flex-direction:column; }
   .admin-toolbar .btn{ flex:1; }
+  /* En el móvil la fila de seis campos no cabe: cada uno a su línea, y los
+     botones de guardar/quitar debajo del todo en vez de apretados al borde. */
+  .lista-campos{ flex-direction:column; align-items:stretch; }
+  .lista-campos input[type="text"], .lista-campos select, .lista-orden{ width:100%; }
+  .lista-fila{ flex-direction:column; align-items:stretch; }
+  .lista-acciones{ justify-content:flex-end; }
+  .descarga-grupo .btn{ flex:1; }
+  .ayuda-paso{ grid-template-columns:1fr; gap:2px; }
   .modal-actions .btn{ width:100%; }
 }

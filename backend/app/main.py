@@ -214,7 +214,7 @@ def al_arrancar():
     """
     from .database import Base  # noqa: F401 - registra los modelos
     from . import models  # noqa: F401
-    from .seed import sembrar
+    from .seed import rellenar_etiquetas, sembrar
     from .models import Categoria, Producto, Usuario
     from .security import cifrar
 
@@ -249,6 +249,17 @@ def al_arrancar():
             # no hay histórico que conservar. Si el modelo crece, Alembic ya
             # está instalado.
             Base.metadata.create_all(bind=motor)
+
+            with SesionLocal() as db:
+                # Las etiquetas dejaron de ser una constante del código. En una
+                # base que ya existía, la tabla nace vacía y el sembrado de
+                # abajo no la toca (sólo corre si la base está virgen), así que
+                # se rellena aquí con lo que los productos ya llevan puesto.
+                # Va dentro del cerrojo: si no, los cuatro workers insertan las
+                # mismas filas a la vez y tres mueren con «duplicate key».
+                recuperadas = rellenar_etiquetas(db)
+                if recuperadas:
+                    log.info("Etiquetas: %s recuperada(s) para el panel.", recuperadas)
 
             with SesionLocal() as db:
                 # Sólo en una base virgen.

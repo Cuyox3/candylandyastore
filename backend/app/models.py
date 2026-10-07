@@ -46,6 +46,34 @@ class Categoria(Base):
     activa: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class Etiqueta(Base):
+    """
+    Las pastillas de la esquina de la tarjeta: «Nuevo», «Top ventas»…
+
+    Eran una constante del código (seed.ETIQUETAS) y ahora son tabla por lo
+    mismo que las categorías: el panel puede crearlas.
+
+    Ojo con `tipo`: NO es texto libre. Es la clase CSS que le da color a la
+    pastilla, y sólo existen las que están escritas en styles.css. Si aquí se
+    colara cualquier cosa, la etiqueta saldría en la tienda sin color y sin
+    que nada avisara. Por eso el panel enseña una lista de colores y el API
+    valida contra COLORES (ver schemas.py).
+
+    El producto sigue guardando `etiqueta` y `tipo` copiados encima, igual que
+    antes: la tarjeta de la tienda se pinta sin tener que consultar esta tabla.
+    """
+
+    __tablename__ = "etiquetas"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # El texto que se ve en la tarjeta. Único porque es lo que identifica a la
+    # etiqueta de cara a quien la usa: dos «Nuevo» distintas no tienen sentido.
+    etiqueta: Mapped[str] = mapped_column(String(40), unique=True, index=True)
+    tipo: Mapped[str] = mapped_column(String(20), default="")
+    orden: Mapped[int] = mapped_column(Integer, default=0)
+    activa: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 class Producto(Base):
     __tablename__ = "productos"
 

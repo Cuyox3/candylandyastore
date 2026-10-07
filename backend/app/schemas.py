@@ -170,6 +170,98 @@ class CategoriaSalida(CategoriaBase):
     id: int
 
 
+class CategoriaEditar(BaseModel):
+    """
+    Cambios sueltos sobre una categoría: lo que no venga, no se toca.
+
+    El `slug` NO está aquí a propósito, no se puede cambiar. Es lo que cada
+    producto guarda en su campo `cat`, así que renombrarlo dejaría a todos los
+    productos de esa categoría apuntando a una que ya no existe: fuera de los
+    filtros de la tienda y, a ojos del dueño, desaparecidos. Para cambiar el
+    nombre que se ve está `label`, que es justo para eso.
+    """
+
+    label: Optional[str] = Field(default=None, min_length=1, max_length=60)
+    orden: Optional[int] = None
+    activa: Optional[bool] = None
+
+
+# ── Etiquetas ──────────────────────────────────────────────────────────────
+# Los colores que sabe pintar styles.css. Esta lista y el CSS van a la par:
+# meter aquí un color que el CSS no conoce deja la pastilla en el rosa de
+# `.tag` sin que nada avise.
+COLORES = {
+    "": "Rosa",
+    "nuevo": "Cian",
+    "top": "Amarillo",
+    "verde": "Verde",
+    "morado": "Morado",
+}
+
+
+def _texto_plano(v: str) -> str:
+    """Un salto de línea dentro de la pastilla sólo sirve para descuadrarla."""
+    return " ".join(str(v).split())
+
+
+class EtiquetaBase(BaseModel):
+    etiqueta: str = Field(min_length=1, max_length=40)
+    tipo: str = Field(default="", max_length=20)
+    orden: int = 0
+    activa: bool = True
+
+    @field_validator("etiqueta")
+    @classmethod
+    def _limpia(cls, v: str) -> str:
+        return _texto_plano(v)
+
+    @field_validator("tipo")
+    @classmethod
+    def _color_conocido(cls, v: str) -> str:
+        if v not in COLORES:
+            nombres = ", ".join(c or "(vacío, rosa)" for c in COLORES)
+            raise ValueError(f"Ese color no existe. Los que hay son: {nombres}.")
+        return v
+
+
+class EtiquetaEditar(BaseModel):
+    etiqueta: Optional[str] = Field(default=None, min_length=1, max_length=40)
+    tipo: Optional[str] = Field(default=None, max_length=20)
+    orden: Optional[int] = None
+    activa: Optional[bool] = None
+
+    @field_validator("etiqueta")
+    @classmethod
+    def _limpia(cls, v: Optional[str]) -> Optional[str]:
+        return v if v is None else _texto_plano(v)
+
+    @field_validator("tipo")
+    @classmethod
+    def _color_conocido(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and v not in COLORES:
+            raise ValueError("Ese color no existe.")
+        return v
+
+
+class EtiquetaSalida(BaseModel):
+    """
+    Lo que consume el desplegable del panel.
+
+    `label` no está en la tabla: se arma con el texto y el nombre del color
+    («Top ventas (Amarillo)»). El formulario lo usa de `key` en React, y sale
+    único porque `etiqueta` lo es.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int = 0
+    etiqueta: str = ""
+    tipo: str = ""
+    orden: int = 0
+    activa: bool = True
+    label: str = ""
+
+
 # ── Acceso ─────────────────────────────────────────────────────────────────
 
 class Credenciales(BaseModel):

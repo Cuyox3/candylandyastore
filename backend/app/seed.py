@@ -12,7 +12,7 @@ tampoco pisa lo que hayas editado desde el panel.
 
 from sqlalchemy.orm import Session
 
-from .models import Categoria, Producto
+from .models import Categoria, Etiqueta, Producto
 
 # Categorías de los filtros de la tienda y del desplegable del panel.
 CATEGORIAS = [
@@ -23,12 +23,18 @@ CATEGORIAS = [
     {"slug": 'bebidas', "label": '🥤 Bebidas', "orden": 4},
 ]
 
-# Etiquetas de la esquina de la tarjeta. Las consume el panel; van aquí para
-# que front y back no tengan cada uno su copia.
-ETIQUETAS = [
-    {"tipo": '', "etiqueta": '', "label": 'Sin etiqueta'},
-    {"tipo": 'nuevo', "etiqueta": 'Nuevo', "label": 'Nuevo (cian)'},
-    {"tipo": 'top', "etiqueta": 'Top ventas', "label": 'Top ventas (amarillo)'},
+# Etiquetas de fábrica para la esquina de la tarjeta.
+#
+# Ya no son LA lista: ahora viven en la tabla `etiquetas` y el panel puede
+# añadir, cambiar y quitar. Esto es sólo con lo que arranca una tienda nueva.
+#
+# «Sin etiqueta» no está aquí y no es un descuido: no es una etiqueta, es la
+# opción de no poner ninguna. Si fuera una fila, el dueño podría borrarla y
+# quedarse sin manera de quitarle la pastilla a un producto. La añade el API
+# al principio de la lista (ver listar_etiquetas).
+ETIQUETAS_BASE = [
+    {"etiqueta": 'Nuevo', "tipo": 'nuevo', "orden": 0},
+    {"etiqueta": 'Top ventas', "tipo": 'top', "orden": 1},
 ]
 
 PRODUCTOS_BASE = [
@@ -243,6 +249,54 @@ PRODUCTOS_BASE = [
 ]
 
 
+def rellenar_etiquetas(db: Session) -> int:
+    """
+    Deja la tabla `etiquetas` con algo dentro si está vacía.
+
+    Esto NO es sembrar: corre en cada despliegue (lo llama `cli migrar`) y
+    existe por las tiendas que ya estaban funcionando cuando las etiquetas
+    eran una constante del código. En esas, la tabla nace vacía y `sembrar` no
+    la toca —sólo entra en bases vírgenes—, así que el dueño se quedaría sin
+    «Nuevo» ni «Top ventas» y sin manera de volver a crearlas con el color
+    original.
+
+    Lo que hay puesto en los productos manda sobre el catálogo de fábrica: si
+    alguien venía usando «Edición limitada», esa etiqueta aparece en el panel
+    tal cual, no se pierde. Las de fábrica se añaden después, por si no estaban
+    en uso.
+
+    Devuelve cuántas creó. Si la tabla ya tenía filas, no hace nada: a partir
+    de ahí manda el panel.
+    """
+    if db.query(Etiqueta).first() is not None:
+        return 0
+
+    creadas = 0
+    vistas: set[tuple[str, str]] = set()
+
+    # Primero las que los productos llevan puestas de verdad.
+    en_uso = (
+        db.query(Producto.etiqueta, Producto.tipo)
+        .filter(Producto.etiqueta != "")
+        .distinct()
+        .all()
+    )
+    for i, (texto, tipo) in enumerate(sorted(en_uso)):
+        vistas.add((texto, tipo))
+        db.add(Etiqueta(etiqueta=texto, tipo=tipo, orden=i))
+        creadas += 1
+
+    # Y luego las de fábrica que no estuvieran ya.
+    for datos in ETIQUETAS_BASE:
+        if any(texto == datos["etiqueta"] for texto, _ in vistas):
+            continue
+        db.add(Etiqueta(etiqueta=datos["etiqueta"], tipo=datos["tipo"], orden=creadas))
+        creadas += 1
+
+    db.commit()
+    return creadas
+
+
 def sembrar(db: Session, forzar: bool = False) -> tuple[int, int]:
     """
     Deja en la base las categorías y los productos de arriba.
@@ -261,6 +315,18 @@ def sembrar(db: Session, forzar: bool = False) -> tuple[int, int]:
         elif forzar:
             cat.label = datos["label"]
             cat.orden = datos["orden"]
+
+    # Las etiquetas van con la misma regla que las categorías: se crean si no
+    # están y sólo se reescriben con `forzar`. No se cuentan en el resultado
+    # para no cambiar lo que devuelve esta función, que ya tenía quien lo leía.
+    for datos in ETIQUETAS_BASE:
+        eti = db.query(Etiqueta).filter(Etiqueta.etiqueta == datos["etiqueta"]).first()
+        if eti is None:
+            db.add(Etiqueta(**datos))
+        elif forzar:
+            eti.tipo = datos["tipo"]
+            eti.orden = datos["orden"]
+            eti.activa = True
 
     prods_nuevos = 0
     # La tienda ordena por `orden` ASCENDENTE, así que el primero de esta lista

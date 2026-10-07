@@ -8,6 +8,8 @@ import Toast from '../componentes/Toast';
 import Acceso from '../componentes/admin/Acceso';
 import FormularioProducto from '../componentes/admin/FormularioProducto';
 import ListaProductos from '../componentes/admin/ListaProductos';
+import { PanelCategorias, PanelEtiquetas } from '../componentes/admin/PanelListas';
+import Ayuda from '../componentes/admin/Ayuda';
 import { useToast } from '../hooks/useToast';
 import { SITIO, useSeo } from '../hooks/useSeo';
 
@@ -60,6 +62,7 @@ export default function Admin() {
   /* --- datos --- */
   const [categorias, setCategorias] = useState([]);
   const [etiquetas, setEtiquetas]   = useState([]);
+  const [colores, setColores]       = useState([]);
   const [productos, setProductos]   = useState([]);
   const [cargando, setCargando]     = useState(false);
 
@@ -72,6 +75,7 @@ export default function Admin() {
   /* --- ventanas --- */
   const [confirmar, setConfirmar] = useState(null);  // { titulo, texto, textoOk, alAceptar }
   const [json, setJson]           = useState(null);  // { modo, texto }
+  const [ayuda, setAyuda]         = useState(false);
   const areaJson = useRef(null);
 
   /* ---------------------------------------------------------
@@ -126,13 +130,19 @@ export default function Admin() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const [cats, etis, prods] = await Promise.all([
-        api.categorias(),
-        api.etiquetas(),
+      /* Con `incluir_inactivas` e `incluir_inactivos`: el panel administra
+         también lo que está apagado, que es justo lo que la tienda no enseña.
+         Sin eso, esconder una categoría la haría desaparecer del panel y no
+         habría manera de volver a encenderla. */
+      const [cats, etis, cols, prods] = await Promise.all([
+        api.categorias(true),
+        api.etiquetas(true),
+        api.coloresEtiqueta(),
         api.productos()
       ]);
       setCategorias(cats);
       setEtiquetas(etis);
+      setColores(cols);
       setProductos(prods);
     } catch (err) {
       mostrar(err.message, true);
@@ -208,8 +218,124 @@ export default function Admin() {
   }
 
   /* ---------------------------------------------------------
+     Categorías
+
+     Las altas y las ediciones dejan subir el error (el panel de listas lo
+     necesita para no cerrar el formulario), y los borrados pasan por la
+     ventana de confirmación, que ya sabe enseñarlo.
+     --------------------------------------------------------- */
+  async function crearCategoria(datos) {
+    const cat = await api.crearCategoria(datos);
+    setCategorias((lista) => [...lista, cat]);
+    mostrar(`Categoría «${cat.label}» creada 🗂️`);
+  }
+
+  async function editarCategoria(categoria, cambios) {
+    try {
+      const nueva = await api.editarCategoria(categoria.slug, cambios);
+      setCategorias((lista) => lista.map((c) => (c.slug === nueva.slug ? nueva : c)));
+      mostrar(`«${nueva.label}» actualizada ✏️`);
+    } catch (err) {
+      mostrar(err.message, true);
+    }
+  }
+
+  function quitarCategoria(categoria, cuantos) {
+    setConfirmar({
+      titulo: `¿Quitar la categoría "${categoria.label}"?`,
+      texto: cuantos
+        ? `Tiene ${cuantos} producto(s) dentro. El servidor no va a dejar borrarla: `
+          + 'muévelos a otra categoría primero, o desmarca «Visible» para esconderla sin perder nada.'
+        : 'Está vacía, así que no afecta a ningún producto.',
+      textoOk: 'Sí, quitar',
+      alAceptar: async () => {
+        const r = await api.quitarCategoria(categoria.slug);
+        setCategorias((lista) => lista.filter((c) => c.slug !== categoria.slug));
+        mostrar(r.detalle);
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------
+     Etiquetas
+     --------------------------------------------------------- */
+  async function crearEtiqueta(datos) {
+    const eti = await api.crearEtiqueta(datos);
+    setEtiquetas((lista) => [...lista, eti]);
+    mostrar(`Etiqueta «${eti.etiqueta}» creada 🏷️`);
+  }
+
+  async function editarEtiqueta(etiqueta, cambios) {
+    try {
+      const nueva = await api.editarEtiqueta(etiqueta.id, cambios);
+      setEtiquetas((lista) => lista.map((e) => (e.id === nueva.id ? nueva : e)));
+      /* El servidor arrastra el cambio a los productos que la tenían puesta,
+         así que la lista que hay en pantalla se quedó vieja. */
+      if (etiqueta.etiqueta !== nueva.etiqueta || etiqueta.tipo !== nueva.tipo) {
+        setProductos((lista) => lista.map((p) =>
+          (p.etiqueta === etiqueta.etiqueta && p.tipo === etiqueta.tipo)
+            ? { ...p, etiqueta: nueva.etiqueta, tipo: nueva.tipo }
+            : p
+        ));
+      }
+      mostrar(`«${nueva.etiqueta}» actualizada ✏️`);
+    } catch (err) {
+      mostrar(err.message, true);
+    }
+  }
+
+  function quitarEtiqueta(etiqueta, cuantos) {
+    setConfirmar({
+      titulo: `¿Quitar la etiqueta "${etiqueta.etiqueta}"?`,
+      texto: cuantos
+        ? `${cuantos} producto(s) la llevan puesta. Se quedarán sin pastilla, pero no `
+          + 'desaparecen ni se esconden de la tienda.'
+        : 'No la lleva ningún producto.',
+      textoOk: 'Sí, quitar',
+      alAceptar: async () => {
+        const r = await api.quitarEtiqueta(etiqueta.id);
+        setEtiquetas((lista) => lista.filter((e) => e.id !== etiqueta.id));
+        if (cuantos) {
+          setProductos((lista) => lista.map((p) =>
+            (p.etiqueta === etiqueta.etiqueta && p.tipo === etiqueta.tipo)
+              ? { ...p, etiqueta: '', tipo: '' }
+              : p
+          ));
+        }
+        mostrar(r.detalle);
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------
      Catálogo completo
      --------------------------------------------------------- */
+  async function descargar(formato) {
+    try {
+      const nombre = await api.descargarCatalogo(formato);
+      mostrar(`Descargando ${nombre} ⬇️`);
+    } catch (err) {
+      mostrar(err.message, true);
+    }
+  }
+
+  /* El .xlsx se manda tal cual y el servidor lo traduce: así la hoja y el
+     JSON entran por el mismo importador y no hay dos juegos de reglas. */
+  function importarExcel(archivo) {
+    setConfirmar({
+      titulo: '¿Reemplazar el catálogo con esa hoja?',
+      texto: `Se borran los ${productos.length} producto(s) actuales y entran los de «${archivo.name}». `
+           + 'Las fotos de los que se mantengan (mismo identificador) no se pierden.',
+      textoOk: 'Sí, reemplazar',
+      alAceptar: async () => {
+        const r = await api.importarExcel(archivo);
+        setEditando(null);
+        await cargar();
+        mostrar(r.detalle);
+      }
+    });
+  }
+
   async function exportar() {
     try {
       const lista = await api.exportar();
@@ -353,7 +479,19 @@ export default function Admin() {
                   vendes. La tienda se actualiza al instante.
                 </p>
               </div>
-              <a href="/#productos" className="btn btn-cyan">Ver la tienda 🍭</a>
+              <div className="admin-head-botones">
+                {/* La guía del panel. Va aquí arriba y no escondida al final
+                    porque quien la necesita la busca antes de tocar nada. */}
+                <button
+                  type="button" className="btn btn-outline btn-ayuda"
+                  onClick={() => setAyuda(true)}
+                  title="Cómo funciona el panel"
+                  aria-label="Abrir la guía del panel"
+                >
+                  <span aria-hidden="true">?</span> Ayuda
+                </button>
+                <a href="/#productos" className="btn btn-cyan">Ver la tienda 🍭</a>
+              </div>
             </div>
 
             <div className="admin-stats" id="stats">
@@ -404,8 +542,31 @@ export default function Admin() {
                   onExportar={exportar}
                   onImportar={importar}
                   onRestaurar={restaurar}
+                  onDescargar={descargar}
+                  onImportarExcel={importarExcel}
                 />
               )}
+            </div>
+
+            {/* Las dos listas que alimentan el formulario de producto. Van
+                debajo porque se tocan de uvas a peras: lo de todos los días
+                es dar de alta un dulce, no inventarse una categoría. */}
+            <div className="admin-grid">
+              <PanelCategorias
+                categorias={categorias}
+                productos={productos}
+                onCrear={crearCategoria}
+                onEditar={editarCategoria}
+                onQuitar={quitarCategoria}
+              />
+              <PanelEtiquetas
+                etiquetas={etiquetas}
+                colores={colores}
+                productos={productos}
+                onCrear={crearEtiqueta}
+                onEditar={editarEtiqueta}
+                onQuitar={quitarEtiqueta}
+              />
             </div>
 
           </div>
@@ -463,6 +624,19 @@ export default function Admin() {
           value={json ? json.texto : ''}
           onChange={(e) => setJson((j) => ({ ...j, texto: e.target.value }))}
         />
+      </ModalAncha>
+
+      <ModalAncha
+        abierto={ayuda}
+        titulo="❓ Guía del panel"
+        onCerrar={() => setAyuda(false)}
+        acciones={
+          <button type="button" className="btn btn-pink" onClick={() => setAyuda(false)}>
+            Entendido
+          </button>
+        }
+      >
+        <Ayuda />
       </ModalAncha>
 
       <Toast aviso={aviso} />

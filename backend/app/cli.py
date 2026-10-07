@@ -34,8 +34,22 @@ def _crear_tablas() -> None:
 
 
 def cmd_migrar() -> int:
+    from .seed import rellenar_etiquetas
+
     _crear_tablas()
+
+    # Las etiquetas pasaron de ser una constante del código a una tabla. En una
+    # tienda que ya estaba en marcha, esa tabla nace vacía y `sembrar` no la
+    # toca (sólo entra en bases vírgenes), así que se rellena aquí: `migrar`
+    # corre en cada despliegue y es justo lo que hace falta para que el cambio
+    # llegue a una base que ya existía. Es idempotente: si hay filas, no hace
+    # nada.
+    with SesionLocal() as db:
+        nuevas = rellenar_etiquetas(db)
+
     print("Tablas creadas/verificadas.")
+    if nuevas:
+        print(f"Etiquetas: {nuevas} recuperada(s) de los productos y del catálogo base.")
     return 0
 
 
